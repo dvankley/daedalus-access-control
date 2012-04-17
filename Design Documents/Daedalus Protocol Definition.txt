@@ -1,0 +1,333 @@
+Note: add a command for a device to update its ID code on packetIndex rollover.
+
+---------------------------------------------------------------
+Daedalus Protocol Specification
+Revision 1.0
+---------------
+
+This document is intended to define the "Daedalus Protocol", so called because "daedalean" can mean "complicated" or "convoluted" and I've been playing a lot of Deus Ex lately. 
+
+Context: This protocol is intended to be used in a home automation context with a central<->field paradigm. However, it is extensible for arbitrary commands and should be suitable for other applications if desired.
+
+Transmission: The protocol is intended to be used over Ethernet networks. The protocol is kept as brief as possible for efficiency's sake, but bandwidth conservation is not a primary design goal. It is assumed that this protocol will primarily be used in LAN settings and will thus have high available bandwidth. Because this protocol will be used to control devices that affect home security, absolute reliability is essential. As such, an acknowledgement mechanism is built into the protocol. It is recommended that TCP be used as a transport layer protocol for this application layer protocol to further ensure transmission reliability. This protocol is strictly point to point, to simplify the security mechanism. Port 25555 is generally used.
+
+Security: While it is technically feasible, it is not recommended to use this protocol over wireless networks (or use it in the same subnet with a wireless network). Doing so creates the possibility of an attacker being able to intercept control system traffic. In this context, the consequences of an attacker compromising the network are unacceptable and all possible steps must be taken to prevent that. When run over a physical LAN with the protocol's ports firewalled from external subnets, an attacker should not be able to sniff network traffic or send commands to devices without gaining physical access to the network.
+Regardless, the protocol also requires encryption of all traffic to further reduce the possibility of an attacker compromising the system. The algorithm chosen is AES symmetric.
+---------------------------------------------------------------
+
+
+---------------------------------------------------------------
+Packet Structure
+---------------------------------------------------------------
+The structure of any arbitrary packet is outlined below. Note that all numerical values over 255 are little endian encoded.
+
+The encryption mechanism requires an additional layer to allow framing of the encrypted bytes in the network stream. 
+
+Length in bytes		  1              2          	    n          1    2    1   
+Offset from start	  0              1                  3         3+n  4+n  6+n  
+Segment name		<SOH><encryptedPacketLength><encryptedPacket><ETX><CRC><EOT>
+
+SOH: Start of header. Always 0x01.
+
+encryptedPacketLength: Length (number of bytes) between encryptedPacketLength and CRC. That is, the index of the first byte of encryptedPacket (not the index of encryptedPacketLength) + the value of encryptedPacketLength = the index of the first byte of CRC. For example, a packet with an encryptedPacket of 1 byte would have a encryptedPacketLength of 2.
+
+encryptedPacket: AES symmetric encrypted control packet (outlined below).
+
+ETX: End of data. Always 0x03.
+
+CRC: 16 bit cyclic redundancy check of all bytes between STX and ETX, inclusive. Little endian encoded. CRC-16-ANSI/IBM, polynomial x16+x15+x2+1. Implemented in Appendix A.
+
+EOT: End of transmission. Always 0x04.
+
+
+
+When decrypted and stripped of all padding, <encryptedPacket> conforms to the following:
+
+Length in bytes		  1        2          	2           1            1                 2                  n          1    2    1
+Offset from start	  0        1            3           5            6                 7                  9         9+n 10+n 12+n
+Segment name		<STX><packetLength><packetIndex><command><commandVersion><commandPayloadLength><commandPayload><ETX><CRC><EOT>
+
+STX: Start of transmission. Always 0x02.
+
+packetLength: Length (number of bytes) between packetLength and CRC. That is, the index of the first byte of packetIndex (not the index of packetLength) + the value of packetLength = the index of the first byte of CRC. For example, a packet with a payload of 1 byte would have a packetLength of 8.
+
+packetIndex: The index of this packet. Packet indices increase by one after each command. The packetIndex is part of the IDHash calculation, which makes it essential that the two devices involved in any given command sequence synchronize their next expected packetIndex from the other device. This process is explained in detail in the Packet Index Synch command description. PacketIndex counts are specific to each device pair, are separate for each device initiating the command, and are also used for command responses (ACK, NACK, etc.). For example, consider communication between a central and a single field device. The last central to field command sequence (that is, the last time the central sent a command to the field device and received an ACK or NACK from the field device) used packetIndex = 64, the last field to central command sequence used packetIndex = 128. The next time the central sends a command to the field device, it will use packetIndex 65, and the field device's ACK or NACK will also use packetIndex = 65. If the central sends a command with a packetIndex other than 65, the field device responds with an "invalid packetIndex" NACK.
+
+IDHash: This is the primary application-level security mechanism. The IDHash for a particular packet is formed by an arbitrary hash of the pre-shared unique ID string of the receiver and the current packetIndex. The hash algorithm to be used is left to the implementer in order to enhance the security of individual implementations, but obviously must be the same for every device in a given system. The unique ID strings must also be defined in each individual device during configuration. If a device receives a packet with an invalid IDHash, it returns an "invalid IDHash" NACK.
+
+command: The qualifier byte for this packet's specific command. Each command has a different structure and payload length.
+
+commandVersion: Most commands will always have this set to 1. If the structure of a command is revised after initial release other versions of a command may be implemented.
+
+commandPayloadLength: Length of the command payload between commandPayloadLength and ETX, exclusive.
+
+ETX: End of data. Always 0x03.
+
+CRC: 16 bit cyclic redundancy check of all bytes between STX and ETX, inclusive. Little endian encoded. CRC-16-ANSI/IBM, polynomial x16+x15+x2+1. Implemented in Appendix A.
+
+EOT: End of transmission. Always 0x04.
+
+---------------------------------------------------------------
+Commands
+---------------------------------------------------------------
+---------------
+Transmit Read Hash
+---------------
+Qualifier: 0x20
+
+Context: Field to central
+
+Description: This command is used by a field device to alert the central that the field device has read a given user hash and taken a given action based on the user hash and the authorized hashes list.
+
+Version: 1
+
+	Payload Structure:
+
+		Length in bytes		  20       1       
+		Offset from start	  0        20      
+		Segment name		<hash><actionTaken>
+
+		Hash: An implementation-specific hash of the user's unique ID string that was just read. A standard SHA-1 hash was used in the reference implementation, but this is not required.
+
+		actionTaken: An enum denoting the action the field device took upon reading this hash.
+			0x20: User on authorized list, access granted
+			0x21: User not on authorized list, access denied
+			
+	Responses:
+		
+		<This command has no command-specific responses>
+			
+---------------
+Authorize Hash(es)
+---------------
+Qualifier: 0x21
+
+Context: Central to field
+
+Description: This command is used to add a given set of hashes to the field device's list of authorized hashes.
+
+Version: 1
+
+	Payload Structure:
+
+		Length in bytes		     1     numHashes*20       
+		Offset from start	     0         1      
+		Segment name		<numHashes><hashList>
+
+		numHashes: The number of user hashes in hashList
+
+		hashList: A list of user hashes to add to the authorized hashes list
+		
+	Responses:
+		
+		<This command has no command-specific responses>
+
+---------------
+De-authorize Hash(es)
+---------------
+Qualifier: 0x22
+
+Context: Central to field
+
+Description: This command is used to remove a given set of hashes from the field device's list of authorized hashes.
+
+Version: 1
+
+	Payload Structure:
+
+		Length in bytes		     1     numHashes*20       
+		Offset from start	     0         1      
+		Segment name		<numHashes><hashList>
+
+		numHashes: The number of user hashes in hashList
+
+		hashList: A list of user hashes to remove from the authorized hashes list, if they are present
+		
+	Responses:
+		
+		<This command has no command-specific responses>
+		
+---------------
+Get Authorized Hash(es)
+---------------
+Qualifier: 0x23
+
+Context: Central to field
+
+Description: This command is used to retrieve the list of currently authorized hashes from a field device.
+
+Version: 1
+
+	Payload Structure:
+
+		<This command has no payload bytes>
+		
+	Responses:
+	
+		commandResponseCode: 0x20. Authorized hash list dump.
+		
+		responsePayloadLength: <variable>
+		
+		responsePayload:
+
+			Length in bytes		     1     numHashes*20         
+			Offset from start	     0         1            
+			Segment name		<numHashes><hashList>
+		
+---------------
+Clear authorized hashes list
+---------------
+Qualifier: 0x24
+
+Context: Central to field
+
+Description: This command is used to delete all the hashes in a field device's authorized hashes list, usually during a synch operation.
+
+Version: 1
+
+	Payload Structure:
+
+		<This command has no payload bytes>
+		
+	Responses:
+		
+		<This command has no command-specific responses>
+
+---------------
+Packet Index Synch
+---------------
+Qualifier: 0x25
+
+Context: All
+
+Description: This command is used in the case of a "Invalid packet index" NACK response, to re-establish packetIndex synchronization. This will generate an "update packetIndex" response with the packetIndex value the device is expecting for the next command packet. This command is a special case in that the packetIndex for this packet will always be 0 and is ignored by the receiving device. For security reasons, a device can never be commanded to set its next packetIndex to a value but will always generate the value itself. If a device has just powered up, it should choose a random number as its next packetIndex value.
+
+Version: 1
+
+	Payload Structure:
+
+		<This command has no payload bytes>
+		
+	Responses:
+	
+		commandResponseCode: 0x20. Update packetIndex.
+		
+			responsePayloadLength: 2
+			
+			responsePayload: The packetIndex value the device is expecting in the next command packet
+		
+			
+		
+---------------------------------------------------------------
+General Responses
+---------------------------------------------------------------
+---------------
+ACK
+---------------
+Qualifier: 0x81
+
+Context: All
+
+Description: This command is used to indicate that a given command was received, authorized, and processed successfully. An ACK contains a general response code and can also contain a response code specific to the command it is responding to and a payload.
+
+Version: 1
+
+	Payload Structure:
+
+		Length in bytes		         1                   1                  1                       2                 n
+		Offset from start	         0                   1                  2                       3                 5
+		Segment name		<generalResponseCode><commandQualifier><commandResponseCode><responsePayloadLength><responsePayload>
+
+		generalResponseCode: A non-command specific response code, if applicable. 0x00 indicates no additional information.
+		
+		commandQualifier: The qualifier byte of the command this packet is in response to.
+
+		responseCode: A command-specific response code, if applicable. 0x00 indicates no additional information.
+		
+---------------
+NACK
+---------------
+Qualifier: 0x82
+
+Context: All
+
+Description: This command is used to indicate that a given command was received, but failed some level of processing or authorization. A NACK contains a general response code and can also contain a response code specific to the command it is responding to.
+
+Version: 1
+
+	Payload Structure:
+
+		Length in bytes		         1                   1                  1      
+		Offset from start	         0                   1                  2      
+		Segment name		<generalResponseCode><commandQualifier><commandResponseCode>
+
+		generalResponseCode: A non-command specific response code, if applicable. 0x00 indicates no additional information.
+			0x20: Invalid packet index. Indicates that the packetIndex element of the received packet was invalid or out of order. Send a Packet Index Synch command to re-establish synchronization.
+			0x21: Invalid IDHash. Indicates that the IDHash element of the received packet was invalid for this device. 
+			0x22: Incorrect CRC.
+			0x23: Invalid/undefined command qualifier.
+			0x24: Invalid packet structure.
+		
+		commandQualifier: The qualifier byte of the command this packet is in response to.
+
+		responseCode: A command-specific response code, if applicable. 0x00 indicates no additional information.
+		
+		
+
+---------------------------------------------------------------
+Appendix A
+CRC Implementation
+---------------------------------------------------------------
+const ushort[] crc16tab =	
+{
+	0x0000, 0xC0C1, 0xC181, 0x0140, 0xC301, 0x03C0, 0x0280, 0xC241,
+	0xC601, 0x06C0, 0x0780, 0xC741, 0x0500, 0xC5C1, 0xC481, 0x0440,
+	0xCC01, 0x0CC0, 0x0D80, 0xCD41, 0x0F00, 0xCFC1, 0xCE81, 0x0E40,
+	0x0A00, 0xCAC1, 0xCB81, 0x0B40, 0xC901, 0x09C0, 0x0880, 0xC841,
+	0xD801, 0x18C0, 0x1980, 0xD941, 0x1B00, 0xDBC1, 0xDA81, 0x1A40,
+	0x1E00, 0xDEC1, 0xDF81, 0x1F40, 0xDD01, 0x1DC0, 0x1C80, 0xDC41,
+	0x1400, 0xD4C1, 0xD581, 0x1540, 0xD701, 0x17C0, 0x1680, 0xD641,
+	0xD201, 0x12C0, 0x1380, 0xD341, 0x1100, 0xD1C1, 0xD081, 0x1040,
+	0xF001, 0x30C0, 0x3180, 0xF141, 0x3300, 0xF3C1, 0xF281, 0x3240,
+	0x3600, 0xF6C1, 0xF781, 0x3740, 0xF501, 0x35C0, 0x3480, 0xF441,
+	0x3C00, 0xFCC1, 0xFD81, 0x3D40, 0xFF01, 0x3FC0, 0x3E80, 0xFE41,
+	0xFA01, 0x3AC0, 0x3B80, 0xFB41, 0x3900, 0xF9C1, 0xF881, 0x3840,
+	0x2800, 0xE8C1, 0xE981, 0x2940, 0xEB01, 0x2BC0, 0x2A80, 0xEA41,
+	0xEE01, 0x2EC0, 0x2F80, 0xEF41, 0x2D00, 0xEDC1, 0xEC81, 0x2C40,
+	0xE401, 0x24C0, 0x2580, 0xE541, 0x2700, 0xE7C1, 0xE681, 0x2640,
+	0x2200, 0xE2C1, 0xE381, 0x2340, 0xE101, 0x21C0, 0x2080, 0xE041,
+	0xA001, 0x60C0, 0x6180, 0xA141, 0x6300, 0xA3C1, 0xA281, 0x6240,
+	0x6600, 0xA6C1, 0xA781, 0x6740, 0xA501, 0x65C0, 0x6480, 0xA441,
+	0x6C00, 0xACC1, 0xAD81, 0x6D40, 0xAF01, 0x6FC0, 0x6E80, 0xAE41,
+	0xAA01, 0x6AC0, 0x6B80, 0xAB41, 0x6900, 0xA9C1, 0xA881, 0x6840,
+	0x7800, 0xB8C1, 0xB981, 0x7940, 0xBB01, 0x7BC0, 0x7A80, 0xBA41,
+	0xBE01, 0x7EC0, 0x7F80, 0xBF41, 0x7D00, 0xBDC1, 0xBC81, 0x7C40,
+	0xB401, 0x74C0, 0x7580, 0xB541, 0x7700, 0xB7C1, 0xB681, 0x7640,
+	0x7200, 0xB2C1, 0xB381, 0x7340, 0xB101, 0x71C0, 0x7080, 0xB041,
+	0x5000, 0x90C1, 0x9181, 0x5140, 0x9301, 0x53C0, 0x5280, 0x9241,
+	0x9601, 0x56C0, 0x5780, 0x9741, 0x5500, 0x95C1, 0x9481, 0x5440,
+	0x9C01, 0x5CC0, 0x5D80, 0x9D41, 0x5F00, 0x9FC1, 0x9E81, 0x5E40,
+	0x5A00, 0x9AC1, 0x9B81, 0x5B40, 0x9901, 0x59C0, 0x5880, 0x9841,
+	0x8801, 0x48C0, 0x4980, 0x8941, 0x4B00, 0x8BC1, 0x8A81, 0x4A40,
+	0x4E00, 0x8EC1, 0x8F81, 0x4F40, 0x8D01, 0x4DC0, 0x4C80, 0x8C41,
+	0x4400, 0x84C1, 0x8581, 0x4540, 0x8701, 0x47C0, 0x4680, 0x8641,
+	0x8201, 0x42C0, 0x4380, 0x8341, 0x4100, 0x81C1, 0x8081, 0x4040
+};	
+
+ushort calc_crc (unsigned char * input, int length)
+{
+	int i;
+	ushort	crc = 0x0000;
+
+	for (i = 0; i < length; i++)
+	{
+		crc = (ushort)(((crc >> 8) & 0xff) ^ crc16tab[(crc ^ input[i]) & 0xff]);
+	}
+	return crc;
+}
+---------------------------------------------------------------
+Appendix B
+Security Case Studies
+---------------------------------------------------------------
+<Coming at some indeterminate point in the future!>
+
