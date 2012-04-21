@@ -327,12 +327,86 @@ namespace DaedalusTestApp
         #endregion
 
         #region Instance Variables
-        // These need to all be filled by every constructor to retain consistency
-        // The processing overhead doesn't really warrant some sort of lazy loading scheme
+        internal string encryptionKey { get; set; }
         internal int encryptedPacketLength { get; set; }
-        internal byte[] encryptedPayload { get; set; }
-        internal byte[] decryptedPayload { get; set; }
-        internal DecryptedDaedalusPacket clearPacket { get; set; }
+        private byte[] _encryptedPayload;
+        internal byte[] encryptedPayload 
+        { 
+            // Implements lazy loading (encrypting/decrypting) for encrypted and decrypted forms
+            // of the Daedalus packet on demand
+            get
+            {
+                if (_encryptedPayload == null)
+                {
+                    if ((encryptionKey == "") || (encryptionKey == null))
+                    {
+                        throw new NullReferenceException("Invalid request for the encrypted payload of a Daedalus " +
+                            "packet that does not currently have an encrypted payload or an encryption key set.");
+                    }
+                    else if (_decryptedPayload == null)
+                    {
+                        throw new NullReferenceException("Invalid request for the encrypted payload of a Daedalus " +
+                            "packet that does not currently have an encrypted or decrypted payload set.");
+                    }
+                    else
+                    {
+                        // Encrypt the decrypted payload, store it, and return it
+                        _encryptedPayload = Convert.FromBase64String(AesEncryptamajig.Encrypt(Convert.ToBase64String(
+                        _decryptedPayload), encryptionKey));
+
+                        return _encryptedPayload;
+                    }
+                }
+                else
+                {
+                    return _encryptedPayload;
+                }
+            } 
+            set
+            {
+                _encryptedPayload = value;   
+            } 
+        }
+        private byte[] _decryptedPayload;
+        internal byte[] decryptedPayload 
+        {    
+            // Implements lazy loading (encrypting/decrypting) for encrypted and decrypted forms
+            // of the Daedalus packet on demand
+            get
+            {
+                if (_decryptedPayload == null)
+                {
+                    if ((encryptionKey == "") || (encryptionKey == null))
+                    {
+                        throw new NullReferenceException("Invalid request for the decrypted payload of a Daedalus " +
+                            "packet that does not currently have a decrypted payload or encryption key set.");
+                    }
+                    else if (_encryptedPayload == null)
+                    {
+                        throw new NullReferenceException("Invalid request for the encrypted payload of a Daedalus " +
+                            "packet that does not currently have an encrypted or decrypted payload set.");
+                    }
+                    else
+                    {
+                        // Decrypt the encrypted payload, store it, and return it
+                        _decryptedPayload = Convert.FromBase64String(AesEncryptamajig.Decrypt(Convert.ToBase64String(
+                        _encryptedPayload), encryptionKey));
+
+                        return _decryptedPayload;
+                    }
+                }
+                else
+                {
+                    return _decryptedPayload;
+                }
+            } 
+            set
+            {
+                _decryptedPayload = value;   
+            } 
+        }
+        //private DecryptedDaedalusPacket _clearPacket;
+        //internal DecryptedDaedalusPacket clearPacket { get; set; }
         #endregion
 
         #region Constructors
@@ -350,6 +424,8 @@ namespace DaedalusTestApp
                 return;
             }
 
+            encryptionKey = AESkey;
+
             // Parse packet elements
             encryptedPacketLength = BitConverter.ToUInt16(inBuffer, elementPacketLength.ElementStaticOffset);
 
@@ -361,33 +437,19 @@ namespace DaedalusTestApp
             decryptedPayload = Convert.FromBase64String(AesEncryptamajig.Decrypt(Convert.ToBase64String(
                 encryptedPayload), AESkey));
 
-            DaedalusGlobal.ReturnCodes rc;
-            int start;
-            int len;
-
-            // Build a clear text packet from the decrypted data
-            if (DecryptedDaedalusPacket.IsValidPacket(decryptedPayload, out rc, out start, out len))
-            {
-                clearPacket = new DecryptedDaedalusPacket(decryptedPayload, start, len, out rc);
-            }
-            else
-            {
-                returnCode = rc;
-                return;
-            }
-
             returnCode = DaedalusGlobal.ReturnCodes.Valid;
         }
 
-        internal EncryptedDaedalusPacket(DecryptedDaedalusPacket inPacket)
+        internal EncryptedDaedalusPacket(DecryptedDaedalusPacket inPacket, string AESKey)
         {
+            encryptionKey = AESKey;
+
             // The decrypted packet's entire size is the payload of the encrypted packet, so the <encryptedPacketLength> is that + size of ETX
             encryptedPacketLength = inPacket.getTotalPacketLength() + elementETX.ElementSize;
 
             // Copy the decrypted packet into the local byte buffer
             decryptedPayload = new byte[inPacket.getTotalPacketLength()];
-            //Array.Copy(inPacket.to
- 
+            Array.Copy(inPacket.toByteBuffer(), decryptedPayload, inPacket.getTotalPacketLength()); 
         }
 
         #endregion
@@ -472,17 +534,25 @@ namespace DaedalusTestApp
             return true;
         }
 
-        internal byte[] toEncryptedBytes()
+        internal DecryptedDaedalusPacket toDecryptedDaedalusPacket(out DaedalusGlobal.ReturnCodes returnCode)
         {
+            DaedalusGlobal.ReturnCodes rc;
+            int start;
+            int len;
 
-        }
-
-        internal DecryptedDaedalusPacket toDecryptedDaedalusPacket()
-        {
-
+            // Build a clear text packet from the decrypted data
+            if (DecryptedDaedalusPacket.IsValidPacket(decryptedPayload, out rc, out start, out len))
+            {
+                returnCode = DaedalusGlobal.ReturnCodes.Valid;
+                return new DecryptedDaedalusPacket(decryptedPayload, start, len, out rc);
+            }
+            else
+            {
+                returnCode = rc;
+                return null;
+            }
         }
 
         #endregion
-
     }
 }
