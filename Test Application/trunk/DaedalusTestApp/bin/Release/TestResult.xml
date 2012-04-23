@@ -1,24 +1,25 @@
 ﻿<?xml version="1.0" encoding="utf-8" standalone="no"?>
 <!--This file represents the results of running a test suite-->
-<test-results name="C:\Users\Dan\Documents\Daedalus Security System\Test Software\trunk\DaedalusTestApp\bin\Release\DaedalusTestApp.exe" total="6" errors="0" failures="0" not-run="0" inconclusive="0" ignored="0" skipped="0" invalid="0" date="2012-04-01" time="15:45:37">
+<test-results name="E:\Daedalus\Test Application\trunk\DaedalusTestApp\bin\Release\DaedalusTestApp.exe" total="6" errors="0" failures="0" not-run="0" inconclusive="0" ignored="0" skipped="0" invalid="0" date="2012-04-23" time="18:39:41">
   <environment nunit-version="2.5.10.11092" clr-version="2.0.50727.4216" os-version="Microsoft Windows NT 6.0.6002 Service Pack 2" platform="Win32NT" cwd="C:\Windows\system32" machine-name="KROG" user="Dan" user-domain="Krog" />
   <culture-info current-culture="en-US" current-uiculture="en-US" />
-  <test-suite type="Assembly" name="C:\Users\Dan\Documents\Daedalus Security System\Test Software\trunk\DaedalusTestApp\bin\Release\DaedalusTestApp.exe" executed="True" result="Success" success="True" time="1.714" asserts="0">
+  <test-suite type="Assembly" name="E:\Daedalus\Test Application\trunk\DaedalusTestApp\bin\Release\DaedalusTestApp.exe" executed="True" result="Success" success="True" time="0.699" asserts="0">
     <results>
-      <test-suite type="Namespace" name="DaedalusTestApp" executed="True" result="Success" success="True" time="1.708" asserts="0">
+      <test-suite type="Namespace" name="DaedalusTestApp" executed="True" result="Success" success="True" time="0.693" asserts="0">
         <results>
-          <test-suite type="TestFixture" name="DaedalusProtocolTests_ConstructPacket" executed="True" result="Success" success="True" time="1.690" asserts="0">
+          <test-suite type="TestFixture" name="DaedalusProtocolTests_ConstructDecryptedPacketFromBytes" executed="True" result="Success" success="True" time="0.672" asserts="0">
             <results>
-              <test-case name="DaedalusTestApp.DaedalusProtocolTests_ConstructPacket.PayloadParseCommandNotImplemented" executed="True" result="Success" success="True" time="1.117" asserts="3" />
-              <test-case name="DaedalusTestApp.DaedalusProtocolTests_ConstructPacket.PayloadParseSuccess" executed="True" result="Success" success="True" time="0.563" asserts="7" />
+              <test-case name="DaedalusTestApp.DaedalusProtocolTests_ConstructDecryptedPacketFromBytes.PayloadParseCommandNotImplemented" executed="True" result="Success" success="True" time="0.646" asserts="3" />
+              <test-case name="DaedalusTestApp.DaedalusProtocolTests_ConstructDecryptedPacketFromBytes.PayloadParseSuccess" executed="True" result="Success" success="True" time="0.015" asserts="7" />
             </results>
           </test-suite>
-          <test-suite type="TestFixture" name="DaedalusProtocolTests_VerifyPacket" executed="True" result="Success" success="True" time="0.015" asserts="0">
+          <test-suite type="TestFixture" name="DaedalusProtocolTests_EncryptAndDecryptPacket" executed="True" result="Inconclusive" success="False" time="0.000" asserts="0" />
+          <test-suite type="TestFixture" name="DaedalusProtocolTests_VerifyDecryptedPacketFromBytes" executed="True" result="Success" success="True" time="0.017" asserts="0">
             <results>
-              <test-case name="DaedalusTestApp.DaedalusProtocolTests_VerifyPacket.CRCFailure" executed="True" result="Success" success="True" time="0.000" asserts="2" />
-              <test-case name="DaedalusTestApp.DaedalusProtocolTests_VerifyPacket.CRCSuccess" executed="True" result="Success" success="True" time="0.001" asserts="2" />
-              <test-case name="DaedalusTestApp.DaedalusProtocolTests_VerifyPacket.LengthFailure" executed="True" result="Success" success="True" time="0.001" asserts="2" />
-              <test-case name="DaedalusTestApp.DaedalusProtocolTests_VerifyPacket.SOHFailure" executed="True" result="Success" success="True" time="0.001" asserts="2" />
+              <test-case name="DaedalusTestApp.DaedalusProtocolTests_VerifyDecryptedPacketFromBytes.CRCFailure" executed="True" result="Success" success="True" time="0.000" asserts="2" />
+              <test-case name="DaedalusTestApp.DaedalusProtocolTests_VerifyDecryptedPacketFromBytes.CRCSuccess" executed="True" result="Success" success="True" time="0.001" asserts="2" />
+              <test-case name="DaedalusTestApp.DaedalusProtocolTests_VerifyDecryptedPacketFromBytes.LengthFailure" executed="True" result="Success" success="True" time="0.000" asserts="2" />
+              <test-case name="DaedalusTestApp.DaedalusProtocolTests_VerifyDecryptedPacketFromBytes.SOHFailure" executed="True" result="Success" success="True" time="0.000" asserts="2" />
             </results>
           </test-suite>
         </results>
