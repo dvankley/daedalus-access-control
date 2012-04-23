@@ -91,9 +91,9 @@ namespace DaedalusTestApp
             int packetLength;
             DecryptedDaedalusPacket packet;
 
-            //                   <STX><packetLength><packetIndex>                   <IDHash>                   <cmd><cmdVer> <cmdLen>  <cmdPay><hash>                                                                                                           <act> <ETX>   <CRC>    <EOT> 
-            //                      0     1     2     3     4     5     6     7     8     9     10   11    12    13    14    15    16    17    18    19    20    21    22    23    24    25    26    27    28    29    30    31    32    33    34    35    36    37    38    39    40    41
-            byte[] testPacket = { 0x02, 0x24, 0x00, 0x01, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x77, 0x01, 0x15, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0x5f, 0x69, 0x04 };
+            //                   <STX><packetLength><packetIndex><cmd><cmdVer> <cmdLen>  <cmdPay><hash>                                                                                                           <act> <ETX>   <CRC>    <EOT> 
+            //                      0     1     2     3     4      5     6     7     8     9     10   11    12    13    14    15    16    17    18    19    20    21    22    23    24    25    26    27    28    29    30    31    32    33    
+            byte[] testPacket = { 0x02, 0x1C, 0x00, 0x01, 0x00, 0x19, 0x01, 0x15, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0xb7, 0xdf, 0x04 };
 
             isValid = DecryptedDaedalusPacket.IsValidPacket(testPacket, out returnCode, out packetStart, out packetLength);
             Assert.AreEqual(isValid, true);
@@ -111,9 +111,9 @@ namespace DaedalusTestApp
             int packetLength;
             DecryptedDaedalusPacket packet;
 
-            //                   <STX><packetLength><packetIndex>                   <IDHash>                   <cmd><cmdVer> <cmdLen>  <cmdPay><hash>                                                                                                           <act> <ETX>   <CRC>    <EOT> 
-            //                      0     1     2     3     4     5     6     7     8     9     10   11    12    13    14    15    16    17    18    19    20    21    22    23    24    25    26    27    28    29    30    31    32    33    34    35    36    37    38    39    40    41
-            byte[] testPacket = { 0x02, 0x24, 0x00, 0x01, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x20, 0x01, 0x15, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0x70, 0xd7, 0x04 };
+            //                   <STX><packetLength><packetIndex><cmd><cmdVer> <cmdLen>  <cmdPay><hash>                                                                                                           <act> <ETX>   <CRC>    <EOT> 
+            //                      0     1     2     3     4      5     6     7     8     9     10   11    12    13    14    15    16    17    18    19    20    21    22    23    24    25    26    27    28    29    30    31    32    33    
+            byte[] testPacket = { 0x02, 0x1C, 0x00, 0x01, 0x00,  0x20, 0x01, 0x15, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0x3A, 0x1f, 0x04 };
 
             isValid = DecryptedDaedalusPacket.IsValidPacket(testPacket, out returnCode, out packetStart, out packetLength);
             Assert.AreEqual(isValid, true);
@@ -130,6 +130,6 @@ namespace DaedalusTestApp
     [TestFixture]
     public class DaedalusProtocolTests_EncryptAndDecryptPacket
     {
-
+        
     }
 }
