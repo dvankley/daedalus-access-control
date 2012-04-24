@@ -511,7 +511,7 @@ namespace DaedalusTestApp
             ushort CRCIn = BitConverter.ToUInt16(inBuffer, CRCIndex);
 
             // Calculate CRC from content of input packet, STX to ETX, inclusive
-            ushort CRCCalc = CRC16.calc_crc(inBuffer, startIndex, (elementSTX.ElementSize + elementPacketLength.ElementSize + inPacketLength));
+            ushort CRCCalc = CRC16.calc_crc(inBuffer, startIndex, elementSTX.ElementSize + elementPacketLength.ElementSize + inPacketLength);
 
             // If the CRC check failed...
             if (CRCIn != CRCCalc)

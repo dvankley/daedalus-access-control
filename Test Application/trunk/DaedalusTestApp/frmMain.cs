@@ -192,9 +192,12 @@ namespace DaedalusTestApp
 
         private void button1_Click(object sender, EventArgs e)
         {
-            DaedalusProtocolTests_ConstructDecryptedPacketFromBytes test = new DaedalusProtocolTests_ConstructDecryptedPacketFromBytes();
-            test.PayloadParseCommandNotImplemented();
-            test.PayloadParseSuccess();
+            DaedalusProtocolTests_ConstructDecryptedPacketFromBytes test1 = new DaedalusProtocolTests_ConstructDecryptedPacketFromBytes();
+            test1.PayloadParseCommandNotImplemented();
+            test1.PayloadParseSuccess();
+            DaedalusProtocolTests_EncryptAndDecryptPacket test2 = new DaedalusProtocolTests_EncryptAndDecryptPacket();
+            test2.BuildEncryptedPacketFromDecryptedPacketSuccess();
+            test2.BuildEncryptedPacketFromEncryptedBufferSuccess();
         }
 
         private void cmdToggleListen_Click(object sender, EventArgs e)
