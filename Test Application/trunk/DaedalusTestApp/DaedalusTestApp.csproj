@@ -53,6 +53,12 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Command Payload Forms\frmTransmitReadHash.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Command Payload Forms\frmTransmitReadHash.Designer.cs">
+      <DependentUpon>frmTransmitReadHash.cs</DependentUpon>
+    </Compile>
     <Compile Include="Comms\CommStructures.cs" />
     <Compile Include="Comms\NetPacket.cs" />
     <Compile Include="Comms\TPLTCPQueuedComm.cs" />
