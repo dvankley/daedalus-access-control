@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Windows.Forms;
+using System.Net;
 
 namespace DaedalusTestApp
 {
@@ -35,6 +37,11 @@ namespace DaedalusTestApp
         /// of the appropriate size.</param>
         /// <returns></returns>
         DaedalusGlobal.ReturnCodes payloadToByteBuffer(Dictionary<string, DaedalusGlobal.PayloadElement> payload, ref byte[] outputBuffer);
+
+        // This is where the magic happens
+        DaedalusGlobal.ReturnCodes processAction(DecryptedDaedalusPacket packet, frmMain mainForm, IPEndPoint source);
+
+        DaedalusGlobal.ReturnCodes showPayloadDefinitionForm(frmMain mainForm, out byte[] payload);
     }
 
     /// <summary>
@@ -111,6 +118,23 @@ namespace DaedalusTestApp
             }
 
             return returnCode;
+        }
+        
+        public DaedalusGlobal.ReturnCodes processAction(DecryptedDaedalusPacket packet, frmMain mainForm, IPEndPoint source)
+        {
+            // So this isn't exactly ideal, but I didn't want to write custom mutators for each control.
+            // So sue me.
+            mainForm.BeginInvoke((Action)(() => mainForm.lstTraffic.Items.Add(
+                  packet.packetIndex + ":" + source.ToString() + ": " + BitConverter.ToString(packet.toByteBuffer())
+                )));
+
+            return DaedalusGlobal.ReturnCodes.Valid;
+        }
+
+        public DaedalusGlobal.ReturnCodes showPayloadDefinitionForm(frmMain mainForm, out byte[] payload)
+        {
+            payload = new byte[1];
+            return DaedalusGlobal.ReturnCodes.Valid;
         }
     }
 }

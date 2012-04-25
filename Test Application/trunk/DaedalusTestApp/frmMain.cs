@@ -26,27 +26,27 @@ namespace DaedalusTestApp
 
         CancellationTokenSource packetProcessingTokenSource = new CancellationTokenSource();
         #region Delegates
-        public delegate void UIDelegate (object UIArg);
-        public delegate void LogDelegate (string input);
-        public delegate string UIReadStringDelegate (System.Windows.Forms.Control controlToRead);
-        public delegate void UISetStringDelegate (System.Windows.Forms.Control controlToSet, string stringToSet);
-        public delegate void UIAddToListBoxDelegate (System.Windows.Forms.ListBox listBox, string stringToSet);
-        public delegate string UIReadComboBoxItemDelegate (System.Windows.Forms.ComboBox comboBox);
-        public delegate int UIReadComboBoxIndexDelegate (System.Windows.Forms.ComboBox comboBox);
-        public delegate void UISetCheckBoxDelegate (System.Windows.Forms.CheckBox checkBox, bool isChecked);
-        public delegate bool UIReadCheckBoxDelegate (System.Windows.Forms.CheckBox checkBox);
-        public delegate void UISetPictureBoxColorDelegate (System.Windows.Forms.PictureBox pictureBox, System.Drawing.Color color);
+        //public delegate void UIDelegate (object UIArg);
+        //public delegate void LogDelegate (string input);
+        //public delegate string UIReadStringDelegate (System.Windows.Forms.Control controlToRead);
+        //public delegate void UISetStringDelegate (System.Windows.Forms.Control controlToSet, string stringToSet);
+        //public delegate void UIAddToListBoxDelegate (System.Windows.Forms.ListBox listBox, string stringToSet);
+        //public delegate string UIReadComboBoxItemDelegate (System.Windows.Forms.ComboBox comboBox);
+        //public delegate int UIReadComboBoxIndexDelegate (System.Windows.Forms.ComboBox comboBox);
+        //public delegate void UISetCheckBoxDelegate (System.Windows.Forms.CheckBox checkBox, bool isChecked);
+        //public delegate bool UIReadCheckBoxDelegate (System.Windows.Forms.CheckBox checkBox);
+        //public delegate void UISetPictureBoxColorDelegate (System.Windows.Forms.PictureBox pictureBox, System.Drawing.Color color);
 
-        UIDelegate delShowErrMsgBox;
-        UISetPictureBoxColorDelegate delSetPictureBoxColor;
-        UIReadStringDelegate delReadUIString;
-        UISetStringDelegate delSetUIString;
-        UIAddToListBoxDelegate delAddToListBox;
-        UIReadComboBoxItemDelegate delReadCboSelectedItem;
-        UIReadComboBoxIndexDelegate delReadCboSelectedIndex;
-        UISetCheckBoxDelegate delSetCheckBox;
-        UIReadCheckBoxDelegate delReadCheckBox;
-        LogDelegate delWriteToDebugLog;
+        //UIDelegate delShowErrMsgBox;
+        //UISetPictureBoxColorDelegate delSetPictureBoxColor;
+        //UIReadStringDelegate delReadUIString;
+        //UISetStringDelegate delSetUIString;
+        //UIAddToListBoxDelegate delAddToListBox;
+        //UIReadComboBoxItemDelegate delReadCboSelectedItem;
+        //UIReadComboBoxIndexDelegate delReadCboSelectedIndex;
+        //UISetCheckBoxDelegate delSetCheckBox;
+        //UIReadCheckBoxDelegate delReadCheckBox;
+        //LogDelegate delWriteToDebugLog;
         #endregion
         #endregion
 
@@ -63,8 +63,6 @@ namespace DaedalusTestApp
         /// <param name="packet">NetPacket containing the incoming packet to be processed</param>
         internal void processNewNetPacket(NetPacket packet)
         {
-
-
             //rxTask = Task.Factory.StartNew(x => networkRxTask(clientTokenSource.Token), "networkRxTask", TaskCreationOptions.LongRunning);
             Task.Factory.StartNew(x => packetProcessingSequence(packet), "packetProcessingSequence" + packet.ToString(), packetProcessingTokenSource.Token);
         }
@@ -93,31 +91,55 @@ namespace DaedalusTestApp
         }
         #endregion
 
-        #region UI Event Handlers
-        private void frmMain_Load (object sender, EventArgs e)
+        #region Helper classes
+        private class ComboBoxEnumItem
         {
-            #region Delegates
-            delShowErrMsgBox = delegate(object input) { MessageBox.Show(this, input.ToString(), "WashDOT Sylvia Simulator Error", MessageBoxButtons.OK); };
-            delReadUIString = delegate(System.Windows.Forms.Control input) { return input.Text; };
-            delSetUIString = delegate(System.Windows.Forms.Control control, string input) { control.Text = input; };
-            delAddToListBox = delegate(System.Windows.Forms.ListBox listBox, string input)
-            {
-                listBox.Items.Add(input);
-                int itemsPerPage = (int)(listBox.Height / listBox.ItemHeight);
-                listBox.TopIndex = listBox.Items.Count - itemsPerPage;
-            };
-            delReadCboSelectedItem = delegate(System.Windows.Forms.ComboBox input) { return (string)input.SelectedItem; };
-            delReadCboSelectedIndex = delegate(System.Windows.Forms.ComboBox input) { return input.SelectedIndex; };
-            delReadCheckBox = delegate(System.Windows.Forms.CheckBox input) { return input.Checked; };
-            delSetCheckBox = delegate(System.Windows.Forms.CheckBox input, bool isChecked) { input.Checked = isChecked; };
-            delSetPictureBoxColor = delegate(System.Windows.Forms.PictureBox input, System.Drawing.Color color) { input.BackColor = color; };
-            delWriteToDebugLog = delegate(string input) { System.Diagnostics.Debugger.Log(0, "Test", input); };
+            public DecryptedDaedalusPacket.Commands enumValue { get; set; }
+            public string enumString { get; set; }
+            public string displayString { get; set; }
+        }
+        #endregion
 
-            #endregion
+        #region UI Event Handlers
+        private void frmMain_Load(object sender, EventArgs e)
+        {
+            //#region Delegates
+            //delShowErrMsgBox = delegate(object input) { MessageBox.Show(this, input.ToString(), "WashDOT Sylvia Simulator Error", MessageBoxButtons.OK); };
+            //delReadUIString = delegate(System.Windows.Forms.Control input) { return input.Text; };
+            //delSetUIString = delegate(System.Windows.Forms.Control control, string input) { control.Text = input; };
+            //delAddToListBox = delegate(System.Windows.Forms.ListBox listBox, string input)
+            //{
+            //    listBox.Items.Add(input);
+            //    int itemsPerPage = (int)(listBox.Height / listBox.ItemHeight);
+            //    listBox.TopIndex = listBox.Items.Count - itemsPerPage;
+            //};
+            //delReadCboSelectedItem = delegate(System.Windows.Forms.ComboBox input) { return (string)input.SelectedItem; };
+            //delReadCboSelectedIndex = delegate(System.Windows.Forms.ComboBox input) { return input.SelectedIndex; };
+            //delReadCheckBox = delegate(System.Windows.Forms.CheckBox input) { return input.Checked; };
+            //delSetCheckBox = delegate(System.Windows.Forms.CheckBox input, bool isChecked) { input.Checked = isChecked; };
+            //delSetPictureBoxColor = delegate(System.Windows.Forms.PictureBox input, System.Drawing.Color color) { input.BackColor = color; };
+            //delWriteToDebugLog = delegate(string input) { System.Diagnostics.Debugger.Log(0, "Test", input); };
+
+            //#endregion
 
             txtAESKey.Text = "AESKey";
 
             comm = new TPLTCPQueuedComm(validatePacket, processNewNetPacket);
+
+            // Fill the combo box with the string representations of the command enums
+            List<ComboBoxEnumItem> commandItems = DecryptedDaedalusPacket.commandTypes.Select(x => new ComboBoxEnumItem()
+            {
+                enumString = Enum.GetName(typeof(DecryptedDaedalusPacket.Commands), x.getCommandType()),
+                displayString = Enum.GetName(typeof(DecryptedDaedalusPacket.Commands), x.getCommandType()),
+                enumValue = x.getCommandType()
+            }).ToList();
+
+            cboProtocolCommand.DataSource = commandItems;
+            cboProtocolCommand.DisplayMember = "displayString";
+            cboProtocolCommand.ValueMember = "enumValue";
+
+            // Select the first entry
+            cboProtocolCommand.SelectedIndex = 0;
         }
 
         private void cmdSendCommand_Click (object sender, EventArgs e)
@@ -139,9 +161,26 @@ namespace DaedalusTestApp
         private void packetProcessingSequence(NetPacket packet)
         {
             DaedalusGlobal.ReturnCodes rc;
-            EncryptedDaedalusPacket encPacket = new EncryptedDaedalusPacket(packet.payload, AESKey, out rc);
+            int packetStart, packetLength;
+            // We already did this in the comms stream parser, but what the hey
+            if (EncryptedDaedalusPacket.IsValidPacket(packet.payload, out rc, out packetStart, out packetLength))
+            {
+                // Build the encrypted packet                
+                EncryptedDaedalusPacket encPacket = new EncryptedDaedalusPacket(packet.payload, packetStart, packetLength, out rc, AESKey);
 
+                // If the decrypted payload is a valid packet...
+                if (DecryptedDaedalusPacket.IsValidPacket(encPacket.decryptedPayload, out rc, out packetStart, out packetLength))
+                {
+                    // Build the decrypted packet
+                    DecryptedDaedalusPacket decPacket = new DecryptedDaedalusPacket(encPacket.decryptedPayload, packetStart, packetLength, out rc);
 
+                    // Resolve the command type of this packet
+                    IDaedalusCommandType commandType = DecryptedDaedalusPacket.commandTypes.Where(p => p.getCommandType() == decPacket.command).First();
+                    
+                    // I don't really like passing the whole form as a parameter, but it was either that, a huge list of parameters, or a big switch statement here
+                    commandType.processAction(decPacket, this, packet.source);
+                }
+            }
         }
 
         //#region AsyncComm delegates
@@ -202,6 +241,18 @@ namespace DaedalusTestApp
 
         private void cmdToggleListen_Click(object sender, EventArgs e)
         {
+            comm.toggleListen();
+        }
+
+        private void cmdDefinePacketPayload_Click(object sender, EventArgs e)
+        {
+            // Get the currently selected comboboxitem
+            // I would be interested in a more generic-friendly way of doing this
+            ComboBoxEnumItem selectedCommand = (ComboBoxEnumItem)Invoke((Func<object>)(() => cboProtocolCommand.SelectedItem));
+            IDaedalusCommandType commandInterface = DecryptedDaedalusPacket.commandTypes.Where(p => p.getCommandType() == selectedCommand.enumValue).First();
+
+            byte[] payload;
+            commandInterface.showPayloadDefinitionForm(this, out payload);
 
         }
     }

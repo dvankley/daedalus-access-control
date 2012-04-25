@@ -415,10 +415,10 @@ namespace DaedalusTestApp
         /// This constructor assumes the buffer passed to it has already been verified using DaedalusPacket.IsValidPacket
         /// and starts with STX and ends with EOT, with no extraneous bytes.
         /// </summary>
-        internal EncryptedDaedalusPacket(byte[] inBuffer, string AESkey, out DaedalusTestApp.DaedalusGlobal.ReturnCodes returnCode)
+        internal EncryptedDaedalusPacket(byte[] inBuffer, int startIndex, int length, out DaedalusTestApp.DaedalusGlobal.ReturnCodes returnCode, string AESkey)
         {
             // Check for STX and EOT in the right places
-            if ((inBuffer[0] != GlobalConstants.SOH) || (inBuffer[inBuffer.Length - 1] != GlobalConstants.EOT))
+            if ((inBuffer[startIndex] != GlobalConstants.SOH) || (inBuffer[startIndex + length - 1] != GlobalConstants.EOT))
             {
                 returnCode = DaedalusGlobal.ReturnCodes.InvalidPacketStructure;
                 return;
@@ -427,11 +427,11 @@ namespace DaedalusTestApp
             encryptionKey = AESkey;
 
             // Parse packet elements
-            encryptedPacketLength = BitConverter.ToUInt16(inBuffer, elementPacketLength.ElementStaticOffset);
+            encryptedPacketLength = BitConverter.ToUInt16(inBuffer, elementPacketLength.ElementStaticOffset + startIndex);
 
             // Copy encrypted payload to internal object
-            encryptedPayload = new byte[encryptedPacketLength - elementETX.ElementSize];
-            Array.Copy(inBuffer, elementEncryptedPacket.ElementStaticOffset, encryptedPayload, 0, encryptedPacketLength - elementETX.ElementSize);
+            encryptedPayload = new byte[startIndex + encryptedPacketLength - elementETX.ElementSize];
+            Array.Copy(inBuffer, startIndex + elementEncryptedPacket.ElementStaticOffset, encryptedPayload, 0, encryptedPacketLength - elementETX.ElementSize);
 
             // Decrypt <encryptedPacket>
             decryptedPayload = Convert.FromBase64String(AesEncryptamajig.Decrypt(Convert.ToBase64String(

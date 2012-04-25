@@ -44,6 +44,27 @@ namespace DaedalusTestApp.Comms
             this.processor = processor;
         }
 
+        #region Public methods
+        public bool isListening()
+        {
+            return rxListenerTask.Status == TaskStatus.Running;
+        }
+
+        public bool toggleListen()
+        {
+            if (isListening())
+            {
+                listenerTokenSource.Cancel();
+            }
+            else
+            {
+                rxListenerTask = Task.Factory.StartNew(x => networkRxListenerTask(listenerTokenSource.Token), "networkRxListenerTask", TaskCreationOptions.LongRunning);
+            }
+
+            return isListening();
+        }
+        #endregion
+
         #region Comms processing methods
         /// <summary>
         /// Responsible for managing the listener socket
@@ -81,24 +102,33 @@ namespace DaedalusTestApp.Comms
                 // Build a wrapper around the tx ConcurrentQueue to allow us to make blocking Take calls
                 BlockingCollection<NetPacket> rxQueue = new BlockingCollection<NetPacket>(inPackets);
 
-                // Get the next input packet to process, blocking until there is a packet available
-                NetPacket currentPacket = rxQueue.Take(listenerTokenSource.Token);
-
-                // Check if anyone has registered for this response packet
-                // Should only be one listener for each endpoint pair, but who knows, kids these days...
-                PacketRegistryEntry entry = rxPacketWaitRegistry.Where(x => (x.source == currentPacket.source) && (x.destination == currentPacket.destination)).First();
-
-                // If there actually was someone registered, we need to notify them and give them the packet
-                // They are responsible for removing their registry entry once they've pulled the packet
-                if (entry != null)
+                try
                 {
-                    entry.packet = currentPacket;
-                    entry.packetReady.Set();
+                    // Get the next input packet to process, blocking until there is a packet available
+                    NetPacket currentPacket = rxQueue.Take(listenerTokenSource.Token);
+
+                    // Check if anyone has registered for this response packet
+                    // Should only be one listener for each endpoint pair, but who knows, kids these days...
+                    PacketRegistryEntry entry = rxPacketWaitRegistry.Where(x => (x.source == currentPacket.source) && (x.destination == currentPacket.destination)).First();
+
+                    // If there actually was someone registered, we need to notify them and give them the packet
+                    // They are responsible for removing their registry entry once they've pulled the packet
+                    if (entry != null)
+                    {
+                        entry.packet = currentPacket;
+                        entry.packetReady.Set();
+                    }
+                    // Otherwise nobody is waiting for this packet, so start it processing straight up
+                    else
+                    {
+                        processor(currentPacket);
+                    }
                 }
-                // Otherwise nobody is waiting for this packet, so start it processing straight up
-                else
+                catch (OperationCanceledException)
                 {
-                    processor(currentPacket);
+                    // Swallow the exception and let the task terminate
+                    // As of this writing, there was no other solid solution to this issue
+                    //http://stackoverflow.com/questions/8953407/using-blockingcollection-operationcanceledexception-is-there-a-better-way
                 }
             }
         }
@@ -114,18 +144,27 @@ namespace DaedalusTestApp.Comms
                 // Build a wrapper around the tx ConcurrentQueue to allow us to make blocking Take calls
                 BlockingCollection<NetPacket> txQueue = new BlockingCollection<NetPacket>(outPackets);
 
-                // Get the next packet to send, blocking until there is a packet available
-                NetPacket currentPacket = txQueue.Take(listenerTokenSource.Token);
+                try
+                {
+                    // Get the next packet to send, blocking until there is a packet available
+                    NetPacket currentPacket = txQueue.Take(listenerTokenSource.Token);
 
-                // Connect to the remote host
-                TcpClient tcp = new TcpClient(currentPacket.destination.Address.ToString(), currentPacket.destination.Port);
+                    // Connect to the remote host
+                    TcpClient tcp = new TcpClient(currentPacket.destination.Address.ToString(), currentPacket.destination.Port);
 
-                // Write the packet payload to the network stream
-                NetworkStream stream = tcp.GetStream();
-                stream.Write(currentPacket.payload, 0, currentPacket.payload.Length);
+                    // Write the packet payload to the network stream
+                    NetworkStream stream = tcp.GetStream();
+                    stream.Write(currentPacket.payload, 0, currentPacket.payload.Length);
 
-                // Hand off the TcpClient to another task to handle any incoming responses
-                Task.Factory.StartNew(x => networkResponseRxTask(tcp, cancelToken), "networkResponseRxTask: " + tcp.Client.RemoteEndPoint.ToString());
+                    // Hand off the TcpClient to another task to handle any incoming responses
+                    Task.Factory.StartNew(x => networkResponseRxTask(tcp, cancelToken), "networkResponseRxTask: " + tcp.Client.RemoteEndPoint.ToString());
+                }
+                catch (OperationCanceledException)
+                {
+                    // Swallow the exception and let the task terminate
+                    // As of this writing, there was no other solid solution to this issue
+                    //http://stackoverflow.com/questions/8953407/using-blockingcollection-operationcanceledexception-is-there-a-better-way
+                }
             }
         }
 

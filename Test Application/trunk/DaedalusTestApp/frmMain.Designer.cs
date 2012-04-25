@@ -1,6 +1,6 @@
 ﻿namespace DaedalusTestApp
 {
-    partial class frmMain
+    public partial class frmMain
     {
         /// <summary>
         /// Required designer variable.
@@ -43,7 +43,7 @@
             this.label5 = new System.Windows.Forms.Label();
             this.txtPacketID = new System.Windows.Forms.TextBox();
             this.label4 = new System.Windows.Forms.Label();
-            this.txtDestinationDeviceID = new System.Windows.Forms.TextBox();
+            this.txtDestinationIP = new System.Windows.Forms.TextBox();
             this.label2 = new System.Windows.Forms.Label();
             this.cboProtocolCommand = new System.Windows.Forms.ComboBox();
             this.button1 = new System.Windows.Forms.Button();
@@ -62,8 +62,8 @@
             // 
             // tabControl1
             // 
-            this.tabControl1.Controls.Add(this.AccessControl);
             this.tabControl1.Controls.Add(this.ProtocolTester);
+            this.tabControl1.Controls.Add(this.AccessControl);
             this.tabControl1.Location = new System.Drawing.Point(12, 51);
             this.tabControl1.Name = "tabControl1";
             this.tabControl1.SelectedIndex = 0;
@@ -120,7 +120,7 @@
             this.ProtocolTester.Controls.Add(this.label5);
             this.ProtocolTester.Controls.Add(this.txtPacketID);
             this.ProtocolTester.Controls.Add(this.label4);
-            this.ProtocolTester.Controls.Add(this.txtDestinationDeviceID);
+            this.ProtocolTester.Controls.Add(this.txtDestinationIP);
             this.ProtocolTester.Controls.Add(this.label2);
             this.ProtocolTester.Controls.Add(this.cboProtocolCommand);
             this.ProtocolTester.Location = new System.Drawing.Point(4, 22);
@@ -161,6 +161,8 @@
             // cboProtocolCommandVersion
             // 
             this.cboProtocolCommandVersion.FormattingEnabled = true;
+            this.cboProtocolCommandVersion.Items.AddRange(new object[] {
+            "1"});
             this.cboProtocolCommandVersion.Location = new System.Drawing.Point(359, 31);
             this.cboProtocolCommandVersion.Name = "cboProtocolCommandVersion";
             this.cboProtocolCommandVersion.Size = new System.Drawing.Size(92, 21);
@@ -181,6 +183,7 @@
             this.cmdDefinePacketPayload.TabIndex = 6;
             this.cmdDefinePacketPayload.Text = "Define Packet Payload";
             this.cmdDefinePacketPayload.UseVisualStyleBackColor = true;
+            this.cmdDefinePacketPayload.Click += new System.EventHandler(this.cmdDefinePacketPayload_Click);
             // 
             // label5
             // 
@@ -203,16 +206,16 @@
             this.label4.AutoSize = true;
             this.label4.Location = new System.Drawing.Point(112, 16);
             this.label4.Name = "label4";
-            this.label4.Size = new System.Drawing.Size(111, 13);
+            this.label4.Size = new System.Drawing.Size(73, 13);
             this.label4.TabIndex = 3;
-            this.label4.Text = "Destination Device ID";
+            this.label4.Text = "Destination IP";
             // 
-            // txtDestinationDeviceID
+            // txtDestinationIP
             // 
-            this.txtDestinationDeviceID.Location = new System.Drawing.Point(115, 32);
-            this.txtDestinationDeviceID.Name = "txtDestinationDeviceID";
-            this.txtDestinationDeviceID.Size = new System.Drawing.Size(111, 20);
-            this.txtDestinationDeviceID.TabIndex = 2;
+            this.txtDestinationIP.Location = new System.Drawing.Point(115, 32);
+            this.txtDestinationIP.Name = "txtDestinationIP";
+            this.txtDestinationIP.Size = new System.Drawing.Size(111, 20);
+            this.txtDestinationIP.TabIndex = 2;
             // 
             // label2
             // 
@@ -331,29 +334,30 @@
 
         #endregion
 
+        // I am a bad, bad man
         private System.Windows.Forms.TabControl tabControl1;
         private System.Windows.Forms.TabPage AccessControl;
         private System.Windows.Forms.Label label1;
         private System.Windows.Forms.ComboBox cboFieldDevices;
-        private System.Windows.Forms.ListBox lstDeviceAuthorizedHashes;
+        internal System.Windows.Forms.ListBox lstDeviceAuthorizedHashes;
         private System.Windows.Forms.TabPage ProtocolTester;
-        private System.Windows.Forms.TextBox txtPacketContent;
+        internal System.Windows.Forms.TextBox txtPacketContent;
         private System.Windows.Forms.Button cmdDefinePacketPayload;
         private System.Windows.Forms.Label label5;
-        private System.Windows.Forms.TextBox txtPacketID;
+        internal System.Windows.Forms.TextBox txtPacketID;
         private System.Windows.Forms.Label label4;
-        private System.Windows.Forms.TextBox txtDestinationDeviceID;
+        internal System.Windows.Forms.TextBox txtDestinationIP;
         private System.Windows.Forms.Label label2;
-        private System.Windows.Forms.ComboBox cboProtocolCommand;
-        private System.Windows.Forms.TextBox txtAESKey;
+        internal System.Windows.Forms.ComboBox cboProtocolCommand;
+        internal System.Windows.Forms.TextBox txtAESKey;
         private System.Windows.Forms.Label label3;
-        private System.Windows.Forms.ListBox lstTraffic;
+        internal System.Windows.Forms.ListBox lstTraffic;
         private System.Windows.Forms.GroupBox groupBox1;
         private System.Windows.Forms.Label label6;
         private System.Windows.Forms.ComboBox cboProtocolCommandVersion;
         private System.Windows.Forms.Label label8;
         private System.Windows.Forms.Button cmdSendCommand;
-        private System.Windows.Forms.TextBox txtPort;
+        internal System.Windows.Forms.TextBox txtPort;
         private System.Windows.Forms.Label label7;
         private System.Windows.Forms.Button cmdToggleListen;
         private System.Windows.Forms.Button button1;
