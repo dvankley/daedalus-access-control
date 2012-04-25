@@ -29,7 +29,7 @@ Segment name		<SOH><encryptedPacketLength><encryptedPacket><ETX><CRC><EOT>
 
 SOH: Start of header. Always 0x01.
 
-encryptedPacketLength: Length (number of bytes) between encryptedPacketLength and CRC. That is, the index of the first byte of encryptedPacket (not the index of encryptedPacketLength) + the value of encryptedPacketLength = the index of the first byte of CRC. For example, a packet with an encryptedPacket of 1 byte would have a encryptedPacketLength of 2.
+encryptedPacketLength: Length (number of bytes) between encryptedPacketLength and CRC. That is, the index of the first byte of encryptedPacket (not the index of encryptedPacketLength) + the value of encryptedPacketLength = the index of the first byte of CRC. For example, a packet with an encryptedPacket payload of 1 byte would have a encryptedPacketLength of 2.
 
 encryptedPacket: AES symmetric encrypted control packet (outlined below).
 
@@ -51,9 +51,7 @@ STX: Start of transmission. Always 0x02.
 
 packetLength: Length (number of bytes) between packetLength and CRC. That is, the index of the first byte of packetIndex (not the index of packetLength) + the value of packetLength = the index of the first byte of CRC. For example, a packet with a payload of 1 byte would have a packetLength of 8.
 
-packetIndex: The index of this packet. Packet indices increase by one after each command. The packetIndex is part of the IDHash calculation, which makes it essential that the two devices involved in any given command sequence synchronize their next expected packetIndex from the other device. This process is explained in detail in the Packet Index Synch command description. PacketIndex counts are specific to each device pair, are separate for each device initiating the command, and are also used for command responses (ACK, NACK, etc.). For example, consider communication between a central and a single field device. The last central to field command sequence (that is, the last time the central sent a command to the field device and received an ACK or NACK from the field device) used packetIndex = 64, the last field to central command sequence used packetIndex = 128. The next time the central sends a command to the field device, it will use packetIndex 65, and the field device's ACK or NACK will also use packetIndex = 65. If the central sends a command with a packetIndex other than 65, the field device responds with an "invalid packetIndex" NACK.
-
-IDHash: This is the primary application-level security mechanism. The IDHash for a particular packet is formed by an arbitrary hash of the pre-shared unique ID string of the receiver and the current packetIndex. The hash algorithm to be used is left to the implementer in order to enhance the security of individual implementations, but obviously must be the same for every device in a given system. The unique ID strings must also be defined in each individual device during configuration. If a device receives a packet with an invalid IDHash, it returns an "invalid IDHash" NACK.
+packetIndex: The index of this packet. Packet indices increase by one after each command. PacketIndex counts are specific to each device pair, are separate for each device initiating the command, and are also used for command responses (ACK, NACK, etc.). For example, consider communication between a central and a single field device. The last central to field command sequence (that is, the last time the central sent a command to the field device and received an ACK or NACK from the field device) used packetIndex = 64, the last field to central command sequence used packetIndex = 128. The next time the central sends a command to the field device, it will use packetIndex 65, and the field device's ACK or NACK will use packetIndex = 66 with its commandPacketIndex = 65. Non-sequential packet indices are acceptable but not recommended for clarity. Note that the packetIndex value is also used in command response packets to identify the packet the response corresponds to.
 
 command: The qualifier byte for this packet's specific command. Each command has a different structure and payload length.
 
@@ -166,6 +164,8 @@ Version: 1
 	
 		commandResponseCode: 0x20. Authorized hash list dump.
 		
+		commandPacketIndex: The packetIndex of the command packet this response corresponds to.
+		
 		responsePayloadLength: <variable>
 		
 		responsePayload:
@@ -212,9 +212,11 @@ Version: 1
 	
 		commandResponseCode: 0x20. Update packetIndex.
 		
-			responsePayloadLength: 2
-			
-			responsePayload: The packetIndex value the device is expecting in the next command packet
+		commandPacketIndex: The packetIndex of the command packet this response corresponds to.
+		
+		responsePayloadLength: 2
+		
+		responsePayload: The packetIndex value the device is expecting in the next command packet
 		
 			
 		
@@ -234,11 +236,13 @@ Version: 1
 
 	Payload Structure:
 
-		Length in bytes		         1                   1                  1                       2                 n
-		Offset from start	         0                   1                  2                       3                 5
-		Segment name		<generalResponseCode><commandQualifier><commandResponseCode><responsePayloadLength><responsePayload>
+		Length in bytes		         1                   2                  1                  1                       2                 n
+		Offset from start	         0                   1                  3                  4                       5                 7
+		Segment name		<generalResponseCode><commandPacketIndex><commandQualifier><commandResponseCode><responsePayloadLength><responsePayload>
 
 		generalResponseCode: A non-command specific response code, if applicable. 0x00 indicates no additional information.
+					
+		commandPacketIndex: The packetIndex of the command packet this response corresponds to.
 		
 		commandQualifier: The qualifier byte of the command this packet is in response to.
 
@@ -257,9 +261,9 @@ Version: 1
 
 	Payload Structure:
 
-		Length in bytes		         1                   1                  1      
-		Offset from start	         0                   1                  2      
-		Segment name		<generalResponseCode><commandQualifier><commandResponseCode>
+		Length in bytes		         1                   2                   1                  1      
+		Offset from start	         0                   1                   3                  4      
+		Segment name		<generalResponseCode><commandPacketIndex><commandQualifier><commandResponseCode>
 
 		generalResponseCode: A non-command specific response code, if applicable. 0x00 indicates no additional information.
 			0x20: Invalid packet index. Indicates that the packetIndex element of the received packet was invalid or out of order. Send a Packet Index Synch command to re-establish synchronization.
@@ -267,6 +271,8 @@ Version: 1
 			0x22: Incorrect CRC.
 			0x23: Invalid/undefined command qualifier.
 			0x24: Invalid packet structure.
+			
+		commandPacketIndex: The packetIndex of the command packet this response corresponds to.
 		
 		commandQualifier: The qualifier byte of the command this packet is in response to.
 
