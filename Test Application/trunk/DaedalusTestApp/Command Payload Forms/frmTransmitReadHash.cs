@@ -15,11 +15,11 @@ namespace DaedalusTestApp.Command_Payload_Forms
         /// <summary>
         /// The primary output of this form, a payload buffer for a Daedalus protocol packet
         /// </summary>
-        private byte[] payload;
+        internal byte[] payload { get; set; }
 
-        public frmTransmitReadHash(ref byte[] inPayload)
+        public frmTransmitReadHash()//ref byte[] inPayload)
         {
-            this.payload = inPayload;
+            //this.payload = inPayload;
             //inPayload = this.payload;
             InitializeComponent();
         }
