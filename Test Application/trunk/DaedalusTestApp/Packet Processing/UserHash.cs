@@ -34,6 +34,16 @@ namespace DaedalusTestApp
             hash = sha.ComputeHash(inBuffer, startIndex, length);
         }
 
+        /// <summary>
+        /// Build a UserHash object from an input string of user data
+        /// </summary>
+        /// <param name="input"></param>
+        internal UserHash(string input, Encoding encoding)
+        {
+            SHA1 sha = new SHA1CryptoServiceProvider();
+            hash = sha.ComputeHash(encoding.GetBytes(input));
+        }
+
         internal byte[] getByteBuffer()
         {
             return hash;

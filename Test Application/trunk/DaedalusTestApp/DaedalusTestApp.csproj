@@ -82,6 +82,9 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="UnitTests.cs" />
     <Compile Include="Packet Processing\UserHash.cs" />
+    <EmbeddedResource Include="Command Payload Forms\frmTransmitReadHash.resx">
+      <DependentUpon>frmTransmitReadHash.cs</DependentUpon>
+    </EmbeddedResource>
     <EmbeddedResource Include="frmMain.resx">
       <DependentUpon>frmMain.cs</DependentUpon>
     </EmbeddedResource>
