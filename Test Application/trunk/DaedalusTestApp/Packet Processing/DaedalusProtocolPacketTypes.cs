@@ -150,10 +150,11 @@ namespace DaedalusTestApp
 
         public bool showPayloadDefinitionForm(frmMain mainForm, out byte[] payload)
         {
-            payload = new byte[] { 0x01, 0x02, 0x03 };
+            //payload = new byte[] { 0x01, 0x02, 0x03 };
 
-            frmTransmitReadHash dialogForm = new frmTransmitReadHash(ref payload);
+            frmTransmitReadHash dialogForm = new frmTransmitReadHash();
             DialogResult result = dialogForm.ShowDialog(mainForm);
+            payload = dialogForm.payload;
             dialogForm.Dispose();
 
             // If the dialog was canceled or the payload value was not set...
