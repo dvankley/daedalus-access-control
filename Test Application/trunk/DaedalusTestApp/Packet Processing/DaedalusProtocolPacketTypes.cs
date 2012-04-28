@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Windows.Forms;
 using System.Net;
+using DaedalusTestApp.Command_Payload_Forms;
 
 namespace DaedalusTestApp
 {
@@ -41,7 +42,14 @@ namespace DaedalusTestApp
         // This is where the magic happens
         DaedalusGlobal.ReturnCodes processAction(DecryptedDaedalusPacket packet, frmMain mainForm, IPEndPoint source);
 
-        DaedalusGlobal.ReturnCodes showPayloadDefinitionForm(frmMain mainForm, out byte[] payload);
+        /// <summary>
+        /// This is only really necessary for the test app. The central system will have entirely different mechanisms for 
+        /// generating packet payloads.
+        /// </summary>
+        /// <param name="mainForm"></param>
+        /// <param name="payload"></param>
+        /// <returns></returns>
+        bool showPayloadDefinitionForm(frmMain mainForm, out byte[] payload);
     }
 
     /// <summary>
@@ -50,6 +58,15 @@ namespace DaedalusTestApp
     /// </summary>
     public class TransmitReadHash : IDaedalusCommandType
     {
+        internal enum ReadHashActions : byte { GrantedUserAuthorized = 0x20, DeniedUserNotAuthorized = 0x21 }
+
+        internal class TransmitAction_ComboBoxEnumItem
+        {
+            public ReadHashActions enumValue { get; set; }
+            public string enumString { get; set; }
+            public string displayString { get; set; }
+        }
+
         public const DecryptedDaedalusPacket.Commands command = DecryptedDaedalusPacket.Commands.TransmitReadHash;
 
         public DecryptedDaedalusPacket.Commands getCommandType()
@@ -85,7 +102,7 @@ namespace DaedalusTestApp
                 elementName = "actionTaken",
                 elementOffset = (ushort)(payload["hash"].elementSize + payload["hash"].elementOffset),
                 elementSize = 1,
-                elementData = (DecryptedDaedalusPacket.ReadHashActions)inBuffer[DecryptedDaedalusPacket.elementCommandPayload.ElementStaticOffset + payload["hash"].elementSize]
+                elementData = (ReadHashActions)inBuffer[DecryptedDaedalusPacket.elementCommandPayload.ElementStaticOffset + payload["hash"].elementSize]
             });
 
             return returnCode;
@@ -131,10 +148,24 @@ namespace DaedalusTestApp
             return DaedalusGlobal.ReturnCodes.Valid;
         }
 
-        public DaedalusGlobal.ReturnCodes showPayloadDefinitionForm(frmMain mainForm, out byte[] payload)
+        public bool showPayloadDefinitionForm(frmMain mainForm, out byte[] payload)
         {
-            payload = new byte[1];
-            return DaedalusGlobal.ReturnCodes.Valid;
+            payload = new byte[] { 0x01, 0x02, 0x03 };
+
+            frmTransmitReadHash dialogForm = new frmTransmitReadHash(ref payload);
+            DialogResult result = dialogForm.ShowDialog(mainForm);
+            dialogForm.Dispose();
+
+            // If the dialog was canceled or the payload value was not set...
+            if ((result != DialogResult.OK) || (payload == null))
+            {
+                return false;
+            }
+            // Otherwise the result was ok and we have a payload value
+            else
+            {
+                return true;
+            }            
         }
     }
 }

@@ -92,7 +92,7 @@ namespace DaedalusTestApp
         #endregion
 
         #region Helper classes
-        private class ComboBoxEnumItem
+        private class DaedalusCommand_ComboBoxEnumItem
         {
             public DecryptedDaedalusPacket.Commands enumValue { get; set; }
             public string enumString { get; set; }
@@ -103,31 +103,12 @@ namespace DaedalusTestApp
         #region UI Event Handlers
         private void frmMain_Load(object sender, EventArgs e)
         {
-            //#region Delegates
-            //delShowErrMsgBox = delegate(object input) { MessageBox.Show(this, input.ToString(), "WashDOT Sylvia Simulator Error", MessageBoxButtons.OK); };
-            //delReadUIString = delegate(System.Windows.Forms.Control input) { return input.Text; };
-            //delSetUIString = delegate(System.Windows.Forms.Control control, string input) { control.Text = input; };
-            //delAddToListBox = delegate(System.Windows.Forms.ListBox listBox, string input)
-            //{
-            //    listBox.Items.Add(input);
-            //    int itemsPerPage = (int)(listBox.Height / listBox.ItemHeight);
-            //    listBox.TopIndex = listBox.Items.Count - itemsPerPage;
-            //};
-            //delReadCboSelectedItem = delegate(System.Windows.Forms.ComboBox input) { return (string)input.SelectedItem; };
-            //delReadCboSelectedIndex = delegate(System.Windows.Forms.ComboBox input) { return input.SelectedIndex; };
-            //delReadCheckBox = delegate(System.Windows.Forms.CheckBox input) { return input.Checked; };
-            //delSetCheckBox = delegate(System.Windows.Forms.CheckBox input, bool isChecked) { input.Checked = isChecked; };
-            //delSetPictureBoxColor = delegate(System.Windows.Forms.PictureBox input, System.Drawing.Color color) { input.BackColor = color; };
-            //delWriteToDebugLog = delegate(string input) { System.Diagnostics.Debugger.Log(0, "Test", input); };
-
-            //#endregion
-
             txtAESKey.Text = "AESKey";
 
             comm = new TPLTCPQueuedComm(validatePacket, processNewNetPacket);
 
             // Fill the combo box with the string representations of the command enums
-            List<ComboBoxEnumItem> commandItems = DecryptedDaedalusPacket.commandTypes.Select(x => new ComboBoxEnumItem()
+            List<DaedalusCommand_ComboBoxEnumItem> commandItems = DecryptedDaedalusPacket.commandTypes.Select(x => new DaedalusCommand_ComboBoxEnumItem()
             {
                 enumString = Enum.GetName(typeof(DecryptedDaedalusPacket.Commands), x.getCommandType()),
                 displayString = Enum.GetName(typeof(DecryptedDaedalusPacket.Commands), x.getCommandType()),
@@ -248,12 +229,21 @@ namespace DaedalusTestApp
         {
             // Get the currently selected comboboxitem
             // I would be interested in a more generic-friendly way of doing this
-            ComboBoxEnumItem selectedCommand = (ComboBoxEnumItem)Invoke((Func<object>)(() => cboProtocolCommand.SelectedItem));
+            DaedalusCommand_ComboBoxEnumItem selectedCommand = (DaedalusCommand_ComboBoxEnumItem)Invoke((Func<object>)(() => cboProtocolCommand.SelectedItem));
             IDaedalusCommandType commandInterface = DecryptedDaedalusPacket.commandTypes.Where(p => p.getCommandType() == selectedCommand.enumValue).First();
 
             byte[] payload;
-            commandInterface.showPayloadDefinitionForm(this, out payload);
-
+            // If we were able to successfully get a payload value...
+            if (commandInterface.showPayloadDefinitionForm(this, out payload))
+            {
+                // Stick our payload into the UI
+                Invoke((Action)(() => txtPacketContent.Text = GlobalHelpers.GlobalMethods.BufferToHexString(payload, 0, payload.Length, " ")));
+            }
+            else
+            {
+                // Blank out the payload
+                Invoke((Action)(() => txtPacketContent.Text = ""));
+            }
         }
     }
 }

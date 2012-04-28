@@ -69,11 +69,6 @@ namespace DaedalusTestApp
 
         public enum Commands : byte { TransmitReadHash = 0x20, AuthorizeHashes = 0x21, DeauthorizeHashes = 0x22, GetAuthorizedHashes = 0x23, ClearAuthorizedHashes = 0x24, PacketIndexSynch = 0x25, ACK = 0x81, NACK = 0x82 };
 
-        #region Command specific enums
-        internal enum ReadHashActions : byte { GrantedUserAuthorized = 0x20, DeniedUserNotAuthorized = 0x21 }
-
-        #endregion
-
         #region Instance Variables
         internal ushort packetLength { get; set; }
         internal ushort packetIndex { get; set; }

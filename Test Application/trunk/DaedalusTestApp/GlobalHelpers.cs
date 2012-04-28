@@ -124,7 +124,7 @@ namespace GlobalHelpers
         }
         #endregion
 
-        public static string BufferToHexString (ref byte[] data, int startIndex, int length, string delimiter)
+        public static string BufferToHexString (byte[] data, int startIndex, int length, string delimiter)
         {
             if (delimiter != "-")
             {
@@ -234,7 +234,7 @@ namespace GlobalHelpers
         /// <param name="value">Value to insert.</param>
         /// <param name="isLittleEndian">If true, non-array values will be inserted LSB first.</param>
         /// <param name="overwriteBytes">Number of bytes at insert point to overwrite.</param>
-        public static void insertValueInBuffer (ref byte[] dataBuffer, int index, ref int bufferLength, object value, bool isLittleEndian, int overwriteBytes)
+        public static void insertValueInBuffer (byte[] dataBuffer, int index, ref int bufferLength, object value, bool isLittleEndian, int overwriteBytes)
         {
             byte[] tailBuffer = new byte[bufferLength - index - overwriteBytes];    // Create a buffer to hold everything in the source buffer on and after the insert point
             Array.Copy(dataBuffer, index + overwriteBytes, tailBuffer, 0, bufferLength - index - overwriteBytes);    // Copy the source buffer on and after the insert point into the temp buffer
@@ -304,7 +304,7 @@ namespace GlobalHelpers
         /// <param name="value">Value to insert.</param>
         /// <param name="isLittleEndian">If true, non-array values will be inserted LSB first.</param>
         /// <param name="overwriteBytes">Number of bytes at insert point to overwrite.</param>
-        public static void insertValueInBuffer (ref byte[] dataBuffer, int index, object value, bool isLittleEndian, int overwriteBytes)
+        public static void insertValueInBuffer (byte[] dataBuffer, int index, object value, bool isLittleEndian, int overwriteBytes)
         {
             int valueSize = Marshal.SizeOf(value.GetType());
             byte[] copyBuffer = new byte[dataBuffer.Length + valueSize - overwriteBytes];    // Create a new buffer to exactly hold the resulting data            
@@ -377,7 +377,7 @@ namespace GlobalHelpers
         /// <param name="value">Value to be added.</param>
         /// <param name="isLittleEndian">If value is not an array and this is set, value will be added
         /// LSB first.</param>
-        public static void addValueToBuffer (ref byte[] buffer, ref int index, object value, bool isLittleEndian)
+        public static void addValueToBuffer (byte[] buffer, ref int index, object value, bool isLittleEndian)
         {
             if (value is byte)
             {
@@ -437,7 +437,7 @@ namespace GlobalHelpers
         /// <param name="buffer">Target byte[] buffer.</param>
         /// <param name="index">Index at which to remove bytes.</param>
         /// <param name="length">Number of bytes to remove.</param>
-        public static void removeValueFromBuffer (ref byte[] buffer, int index, int length)
+        public static void removeValueFromBuffer (byte[] buffer, int index, int length)
         {
             byte[] copyBuffer = new byte[buffer.Length - length];
             Array.Copy(buffer, 0, copyBuffer, 0, index);
@@ -451,7 +451,7 @@ namespace GlobalHelpers
         /// <param name="dataBuffer">Buffer containing integer encoding.</param>
         /// <param name="startIndex">Index of encoding MSB.</param>
         /// <returns></returns>
-        public static ushort BigEndianToUInt16 (ref byte[] dataBuffer, int startIndex)
+        public static ushort BigEndianToUInt16 (byte[] dataBuffer, int startIndex)
         {
             return (ushort)((dataBuffer[startIndex++] << 8) + dataBuffer[startIndex]);
         }
@@ -462,7 +462,7 @@ namespace GlobalHelpers
         /// <param name="dataBuffer">Buffer containing integer encoding.</param>
         /// <param name="startIndex">Index of encoding MSB.</param>
         /// <returns></returns>
-        public static uint BigEndianToUInt32 (ref byte[] dataBuffer, int startIndex)
+        public static uint BigEndianToUInt32 (byte[] dataBuffer, int startIndex)
         {
             return (uint)((dataBuffer[startIndex++] << 24) + (dataBuffer[startIndex++] << 16) + (dataBuffer[startIndex++] << 8) + dataBuffer[startIndex]);
         }
@@ -474,7 +474,7 @@ namespace GlobalHelpers
         /// <param name="startIndex">Index to start calculating at.</param>
         /// <param name="length">Number of bytes to add up starting from <paramref name="startIndex"/></param>
         /// <returns>Total value of all bytes added together. Overflow is dropped.</returns>
-        public static byte additiveChecksum (ref byte[] buffer, int startIndex, int length)
+        public static byte additiveChecksum (byte[] buffer, int startIndex, int length)
         {
             byte runningSum = 0;
 
