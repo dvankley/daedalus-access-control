@@ -67,7 +67,8 @@ namespace DaedalusTestApp
         internal readonly static IEnumerable<IDaedalusCommandType> commandTypes;
         #endregion
 
-        public enum Commands : byte { TransmitReadHash = 0x20, AuthorizeHashes = 0x21, DeauthorizeHashes = 0x22, GetAuthorizedHashes = 0x23, ClearAuthorizedHashes = 0x24, PacketIndexSynch = 0x25, ACK = 0x81, NACK = 0x82 };
+        public enum Commands : byte { TransmitReadHash = 0x20, AuthorizeHashes = 0x21, DeauthorizeHashes = 0x22, 
+            GetAuthorizedHashes = 0x23, ClearAuthorizedHashes = 0x24, PacketIndexSynch = 0x25, ACK = 0x81, NACK = 0x82 };
 
         #region Instance Variables
         internal ushort packetLength { get; set; }
@@ -75,6 +76,7 @@ namespace DaedalusTestApp
         //internal IDHash hash { get; set; }
         internal Commands command { get; set; }
         internal byte commandVersion { get; set; }
+        internal IDaedalusCommandType commandType { get; set; }
         internal Dictionary<string, DaedalusGlobal.PayloadElement> payload { get; set; }
         #endregion
 
@@ -87,6 +89,15 @@ namespace DaedalusTestApp
                 .SelectMany(s => s.GetTypes())
                 .Where(p => interfaceType.IsAssignableFrom(p) && p.IsClass)
                 .Select(t => (IDaedalusCommandType)Activator.CreateInstance(t));
+        }
+
+        internal DecryptedDaedalusPacket()
+        {
+            packetLength = 0;
+            packetIndex = 0;
+            command = Commands.NACK;
+            commandVersion = 1;
+            payload = new Dictionary<string, DaedalusGlobal.PayloadElement>();
         }
 
         /// <summary>
@@ -114,7 +125,7 @@ namespace DaedalusTestApp
             payload = new Dictionary<string, DaedalusGlobal.PayloadElement>();
 
             // Select the first of the packet types (should only be one) that match the type of this command
-            IEnumerable<IDaedalusCommandType> commandTypeMatches = commandTypes.Where(p => p.getCommandType() == command);
+            IEnumerable<IDaedalusCommandType> commandTypeMatches = commandTypes.Where(p => p.getCommand() == command);
 
             // Parse this packet's payload
             if (commandTypeMatches.Count() == 0)
@@ -127,13 +138,16 @@ namespace DaedalusTestApp
             else
             {
                 // Just in case there's more than one type for each command, take the first one
-                IDaedalusCommandType commandType = commandTypeMatches.First();
+                this.commandType = commandTypeMatches.First();
 
                 byte[] payloadBuffer = new byte[length];
                 Array.Copy(inBuffer, startIndex, payloadBuffer, 0, length);
 
+                Dictionary<string, DaedalusGlobal.PayloadElement> tryPayload;
+
                 // Try to parse the packet's payload
-                returnCode = commandType.parsePayload(ref payloadBuffer, payload);
+                returnCode = commandType.parsePayload(payloadBuffer, elementCommandPayload.ElementStaticOffset, out tryPayload);
+                this.payload = tryPayload;
 #if DEBUG
                 if (returnCode == DaedalusGlobal.ReturnCodes.Valid)
                 {
@@ -242,7 +256,7 @@ namespace DaedalusTestApp
             outBuffer[elementCommandVersion.ElementStaticOffset] = (byte)commandVersion;
 
             // Select the first of the packet types (should only be one) that match the type of this command
-            IEnumerable<IDaedalusCommandType> commandTypeMatches = commandTypes.Where(p => p.getCommandType() == command);
+            IEnumerable<IDaedalusCommandType> commandTypeMatches = commandTypes.Where(p => p.getCommand() == command);
 
             // This will be reassigned by payloadToByteBuffer
             byte[] payloadBuffer = new byte[1];
@@ -259,7 +273,8 @@ namespace DaedalusTestApp
             else
             {
                 // Just in case there's more than one type for each command, take the first one
-                IDaedalusCommandType commandType = commandTypeMatches.First();
+                //IDaedalusCommandType commandType = commandTypeMatches.First();
+                this.commandType = commandTypeMatches.First();
 
                 commandType.payloadToByteBuffer(this.payload, ref payloadBuffer);
             }
@@ -287,6 +302,18 @@ namespace DaedalusTestApp
             outBuffer[elementEOT.ElementVariableOffset + payloadBuffer.Length] = GlobalConstants.EOT;
 
             return outBuffer;
+        }
+
+        /// <summary>
+        /// Used for packets built with the default contructor and then manually put together.
+        /// This method will calculate and set the packetLength field value based on the size of the payload
+        /// field and the static size of other packet elements.
+        /// </summary>
+        internal void setPacketLengthFieldValue()
+        {   //<packetIndex><command><commandVersion><commandPayloadLength><commandPayload>
+            this.packetLength = (ushort)(elementPacketIndex.ElementSize + elementCommand.ElementSize +
+                elementCommandVersion.ElementSize + elementCommandPayloadLength.ElementSize + this.commandType.getPayloadLength(this.payload) +
+                elementETX.ElementSize);
         }
 
         internal int getTotalPacketLength()
@@ -548,6 +575,11 @@ namespace DaedalusTestApp
             }
         }
 
+        internal byte[] toByteBuffer()
+        {
+            // To do
+            return new byte[] { };
+        }
         #endregion
     }
 }

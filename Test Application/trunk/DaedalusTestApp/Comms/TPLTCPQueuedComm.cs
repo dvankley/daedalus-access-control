@@ -16,8 +16,9 @@ namespace DaedalusTestApp.Comms
 
         internal const uint packetBufferSize = 1024;
 
-        internal ConcurrentQueue<NetPacket> inPackets = new ConcurrentQueue<NetPacket>();
-        internal ConcurrentQueue<NetPacket> outPackets = new ConcurrentQueue<NetPacket>();
+        // Defaults to using a ConcurrentQueue as the underlying data store
+        internal BlockingCollection<NetPacket> inPackets = new BlockingCollection<NetPacket>();
+        internal BlockingCollection<NetPacket> outPackets = new BlockingCollection<NetPacket>();
         internal CancellationTokenSource listenerTokenSource = new CancellationTokenSource();
         internal CancellationTokenSource clientTokenSource = new CancellationTokenSource();
         //public CancellationToken shutdownToken;
@@ -58,6 +59,7 @@ namespace DaedalusTestApp.Comms
             }
             else
             {
+                listenerTokenSource = new CancellationTokenSource();
                 rxListenerTask = Task.Factory.StartNew(x => networkRxListenerTask(listenerTokenSource.Token), "networkRxListenerTask", TaskCreationOptions.LongRunning);
             }
 
@@ -72,7 +74,7 @@ namespace DaedalusTestApp.Comms
         /// <param name="cancelToken"></param>
         private void networkRxListenerTask(CancellationToken cancelToken)
         {
-            IPAddress localAddr = IPAddress.Parse("127.0.0.1");
+            IPAddress localAddr = IPAddress.Parse("192.168.1.99");
 
             // TcpListener server = new TcpListener(port);
             TcpListener server = new TcpListener(localAddr, DaedalusGlobal.DaedalusPort);
@@ -84,11 +86,15 @@ namespace DaedalusTestApp.Comms
             {
                 // Perform a blocking call to accept requests.
                 // You could also use server.AcceptSocket() here.
-                TcpClient client = server.AcceptTcpClient();
+                if (server.Pending())
+                {
+                    TcpClient client = server.AcceptTcpClient();
 
-                // Hand off the TcpClient to another task to handle any incoming responses
-                Task.Factory.StartNew(x => networkResponseRxTask(client, cancelToken), "networkResponseRxTask: " + client.Client.RemoteEndPoint.ToString());
+                    // Hand off the TcpClient to another task to handle any incoming responses
+                    Task.Factory.StartNew(x => networkResponseRxTask(client, cancelToken), "networkResponseRxTask: " + client.Client.RemoteEndPoint.ToString());
+                }
             }
+            server.Stop();
         }
 
         /// <summary>
@@ -100,29 +106,31 @@ namespace DaedalusTestApp.Comms
             while (!cancelToken.IsCancellationRequested)
             {
                 // Build a wrapper around the tx ConcurrentQueue to allow us to make blocking Take calls
-                BlockingCollection<NetPacket> rxQueue = new BlockingCollection<NetPacket>(inPackets);
+                //BlockingCollection<NetPacket> rxQueue = new BlockingCollection<NetPacket>(inPackets);
 
                 try
                 {
                     // Get the next input packet to process, blocking until there is a packet available
-                    NetPacket currentPacket = rxQueue.Take(listenerTokenSource.Token);
+                    NetPacket currentPacket = inPackets.Take(listenerTokenSource.Token);
 
                     // Check if anyone has registered for this response packet
                     // Should only be one listener for each endpoint pair, but who knows, kids these days...
-                    PacketRegistryEntry entry = rxPacketWaitRegistry.Where(x => (x.source == currentPacket.source) && (x.destination == currentPacket.destination)).First();
-
-                    // If there actually was someone registered, we need to notify them and give them the packet
-                    // They are responsible for removing their registry entry once they've pulled the packet
-                    if (entry != null)
+                    IEnumerable<PacketRegistryEntry> matchingEntries = rxPacketWaitRegistry.Where(x => (x.source == currentPacket.source) && (x.destination == currentPacket.destination));
+                    if (matchingEntries.Count() > 0)
                     {
-                        entry.packet = currentPacket;
-                        entry.packetReady.Set();
+                        PacketRegistryEntry entry = matchingEntries.First();
+
+                        // If there actually was someone registered, we need to notify them and give them the packet
+                        // They are responsible for removing their registry entry once they've pulled the packet
+                        if (entry != null)
+                        {
+                            entry.packet = currentPacket;
+                            entry.packetReady.Set();
+                            continue;
+                        }
                     }
                     // Otherwise nobody is waiting for this packet, so start it processing straight up
-                    else
-                    {
-                        processor(currentPacket);
-                    }
+                    processor(currentPacket);
                 }
                 catch (OperationCanceledException)
                 {
@@ -142,12 +150,12 @@ namespace DaedalusTestApp.Comms
             while (!cancelToken.IsCancellationRequested)
             {
                 // Build a wrapper around the tx ConcurrentQueue to allow us to make blocking Take calls
-                BlockingCollection<NetPacket> txQueue = new BlockingCollection<NetPacket>(outPackets);
+                //BlockingCollection<NetPacket> txQueue = new BlockingCollection<NetPacket>(outPackets);
 
                 try
                 {
                     // Get the next packet to send, blocking until there is a packet available
-                    NetPacket currentPacket = txQueue.Take(listenerTokenSource.Token);
+                    NetPacket currentPacket = outPackets.Take(listenerTokenSource.Token);
 
                     // Connect to the remote host
                     TcpClient tcp = new TcpClient(currentPacket.destination.Address.ToString(), currentPacket.destination.Port);
@@ -164,6 +172,10 @@ namespace DaedalusTestApp.Comms
                     // Swallow the exception and let the task terminate
                     // As of this writing, there was no other solid solution to this issue
                     //http://stackoverflow.com/questions/8953407/using-blockingcollection-operationcanceledexception-is-there-a-better-way
+                }
+                catch (SocketException ex)
+                {
+                    // Swallow for now
                 }
             }
         }
@@ -223,10 +235,10 @@ namespace DaedalusTestApp.Comms
                     {
                         addNewRxPacket(TransportType.Tcp, tcp.Client.LocalEndPoint, tcp.Client.RemoteEndPoint,
                             inPackets, rxPacketWaitRegistry, bufferArray, packetStart, packetLength);
-                    }
 
-                    // Remove the packet and all preceding bytes from the input buffer
-                    rxBuffer.RemoveRange(0, packetStart + packetLength);
+                        // Remove the packet and all preceding bytes from the input buffer
+                        rxBuffer.RemoveRange(0, packetStart + packetLength);
+                    }
                 }
 
                 // No good way to sleep inside a task... we'll see if this burns too much processor just looping as-is
@@ -239,13 +251,13 @@ namespace DaedalusTestApp.Comms
         }
 
         private void addNewRxPacket(TransportType transport, EndPoint d, EndPoint s,
-            ConcurrentQueue<NetPacket> rxPacketQueue, List<PacketRegistryEntry> rxPacketRegistry,
+            BlockingCollection<NetPacket> rxPacketQueue, List<PacketRegistryEntry> rxPacketRegistry,
             byte[] payloadBuffer, int packetStart, int packetLength)
         {
             byte[] newPayload = new byte[packetLength - packetStart];
             Array.Copy(payloadBuffer, packetStart, newPayload, 0, packetLength);
 
-            rxPacketQueue.Enqueue(new NetPacket
+            rxPacketQueue.Add(new NetPacket
             {
                 destination = (IPEndPoint)d,
                 source = (IPEndPoint)s,

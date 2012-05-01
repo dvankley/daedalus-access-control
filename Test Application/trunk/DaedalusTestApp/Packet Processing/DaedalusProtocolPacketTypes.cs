@@ -20,7 +20,7 @@ namespace DaedalusTestApp
         /// the given command type
         /// </summary>
         /// <returns>Commands enum for the qualifier that corresponds to this command type</returns>
-        DecryptedDaedalusPacket.Commands getCommandType();
+        DecryptedDaedalusPacket.Commands getCommand();
 
         /// <summary>
         /// Parses the packet buffer and returns a list of payload elements for this command type
@@ -28,7 +28,7 @@ namespace DaedalusTestApp
         /// <param name="inBuffer">Reference to the incoming packet buffer</param>
         /// <param name="payload">List of payload elements parsed from the incoming packet buffer</param>
         /// <returns>Standard return code</returns>
-        DaedalusGlobal.ReturnCodes parsePayload(ref byte[] inBuffer, Dictionary<string, DaedalusGlobal.PayloadElement> payload);
+        DaedalusGlobal.ReturnCodes parsePayload(byte[] inBuffer, int startIndex, out Dictionary<string, DaedalusGlobal.PayloadElement> payload);
 
         /// <summary>
         /// Builds a packet buffer from a command payload data structure based on the deterministic packet format of that command.
@@ -38,6 +38,8 @@ namespace DaedalusTestApp
         /// of the appropriate size.</param>
         /// <returns></returns>
         DaedalusGlobal.ReturnCodes payloadToByteBuffer(Dictionary<string, DaedalusGlobal.PayloadElement> payload, ref byte[] outputBuffer);
+
+        ushort getPayloadLength(Dictionary<string, DaedalusGlobal.PayloadElement> payload);
 
         // This is where the magic happens
         DaedalusGlobal.ReturnCodes processAction(DecryptedDaedalusPacket packet, frmMain mainForm, IPEndPoint source);
@@ -69,7 +71,7 @@ namespace DaedalusTestApp
 
         public const DecryptedDaedalusPacket.Commands command = DecryptedDaedalusPacket.Commands.TransmitReadHash;
 
-        public DecryptedDaedalusPacket.Commands getCommandType()
+        public DecryptedDaedalusPacket.Commands getCommand()
         {
             return command;
         }
@@ -80,13 +82,13 @@ namespace DaedalusTestApp
         /// <param name="inBuffer">Incoming byte buffer to parse</param>
         /// <param name="payload">Reference to the payload data structure in which to put the parsed data</param>
         /// <returns>Daedalus return code</returns>
-        public DaedalusGlobal.ReturnCodes parsePayload(ref byte[] inBuffer, Dictionary<string, DaedalusGlobal.PayloadElement> payload)
+        public DaedalusGlobal.ReturnCodes parsePayload(byte[] inBuffer, int startIndex, out Dictionary<string, DaedalusGlobal.PayloadElement> payload)
         {
-            //payload = new Dictionary<string, DaedalusProtocolPacket.PayloadElement>();
-            if (payload == null)
-            {
-                throw new ArgumentNullException("payload", "Payload object passed to " + this.GetType().ToString() + ".parsePayload() as null, should be a instantiated Dictionary.");
-            }
+            payload = new Dictionary<string, DaedalusGlobal.PayloadElement>();
+            //if (payload == null)
+            //{
+            //    throw new ArgumentNullException("payload", "Payload object passed to " + this.GetType().ToString() + ".parsePayload() as null, should be a instantiated Dictionary.");
+            //}
 
             DaedalusGlobal.ReturnCodes returnCode = DaedalusGlobal.ReturnCodes.Valid;
 
@@ -95,14 +97,16 @@ namespace DaedalusTestApp
                 elementName = "hash",
                 elementOffset = 0,
                 elementSize = 20,
-                elementData = new UserHash(inBuffer, DecryptedDaedalusPacket.elementCommandPayload.ElementStaticOffset)
+                //elementData = new UserHash(inBuffer, DecryptedDaedalusPacket.elementCommandPayload.ElementStaticOffset)
+                elementData = new UserHash(inBuffer, startIndex)
             });
             payload.Add("actionTaken", new DaedalusGlobal.PayloadElement()
             {
                 elementName = "actionTaken",
                 elementOffset = (ushort)(payload["hash"].elementSize + payload["hash"].elementOffset),
                 elementSize = 1,
-                elementData = (ReadHashActions)inBuffer[DecryptedDaedalusPacket.elementCommandPayload.ElementStaticOffset + payload["hash"].elementSize]
+                //elementData = (ReadHashActions)inBuffer[DecryptedDaedalusPacket.elementCommandPayload.ElementStaticOffset + payload["hash"].elementSize]
+                elementData = (ReadHashActions)inBuffer[startIndex + payload["hash"].elementSize]
             });
 
             return returnCode;
@@ -136,6 +140,15 @@ namespace DaedalusTestApp
 
             return returnCode;
         }
+
+        public ushort getPayloadLength(Dictionary<string, DaedalusGlobal.PayloadElement> payload)
+        {
+            if (payload == null)
+            {
+                throw new ArgumentNullException();
+            }
+            return (ushort)payload.Sum(x => x.Value.elementSize);
+        }
         
         public DaedalusGlobal.ReturnCodes processAction(DecryptedDaedalusPacket packet, frmMain mainForm, IPEndPoint source)
         {
@@ -150,8 +163,6 @@ namespace DaedalusTestApp
 
         public bool showPayloadDefinitionForm(frmMain mainForm, out byte[] payload)
         {
-            //payload = new byte[] { 0x01, 0x02, 0x03 };
-
             frmTransmitReadHash dialogForm = new frmTransmitReadHash();
             DialogResult result = dialogForm.ShowDialog(mainForm);
             payload = dialogForm.payload;
