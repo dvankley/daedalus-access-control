@@ -21,8 +21,16 @@ namespace DaedalusTestApp
     {
         #region Global Variables
         const string AESKey = "I<3Ponies";
+        // Why can't these be const?
+        readonly Color listening = Color.Green;
+        readonly Color notListening = Color.Red;
+        bool lastListeningState = false;
 
+        object commLocker = new object();
         TPLTCPQueuedComm comm;
+        static ushort packetIndex = 0;
+
+        System.Threading.Timer checkListenerTimer;
 
         CancellationTokenSource packetProcessingTokenSource = new CancellationTokenSource();
         #region Delegates
@@ -50,7 +58,7 @@ namespace DaedalusTestApp
         #endregion
         #endregion
 
-        public frmMain ()
+        public frmMain()
         {
             InitializeComponent();
         }
@@ -83,7 +91,9 @@ namespace DaedalusTestApp
             int start;
             int length;
 
+            // Replace encrypted packet validator later
             bool valid = EncryptedDaedalusPacket.IsValidPacket(buffer, out returnCode, out start, out length);
+            //bool valid = DecryptedDaedalusPacket.IsValidPacket(buffer, out returnCode, out start, out length);
             rc = (int)returnCode;
             packetStart = start;
             packetLength = length;
@@ -110,9 +120,9 @@ namespace DaedalusTestApp
             // Fill the combo box with the string representations of the command enums
             List<DaedalusCommand_ComboBoxEnumItem> commandItems = DecryptedDaedalusPacket.commandTypes.Select(x => new DaedalusCommand_ComboBoxEnumItem()
             {
-                enumString = Enum.GetName(typeof(DecryptedDaedalusPacket.Commands), x.getCommandType()),
-                displayString = Enum.GetName(typeof(DecryptedDaedalusPacket.Commands), x.getCommandType()),
-                enumValue = x.getCommandType()
+                enumString = Enum.GetName(typeof(DecryptedDaedalusPacket.Commands), x.getCommand()),
+                displayString = Enum.GetName(typeof(DecryptedDaedalusPacket.Commands), x.getCommand()),
+                enumValue = x.getCommand()
             }).ToList();
 
             cboProtocolCommand.DataSource = commandItems;
@@ -121,15 +131,8 @@ namespace DaedalusTestApp
 
             // Select the first entry
             cboProtocolCommand.SelectedIndex = 0;
-        }
 
-        private void cmdSendCommand_Click (object sender, EventArgs e)
-        {
-            //if (comm == null || comm.IsDisposed)
-            //{
-            //    comm = new AsyncTCPComm(packetBufferSize, ValidateOmegaPacketDelegate, ReceivedOmegaPacketDelegate, SocketCloseDelegate, CommExceptionDelegate);
-
-            //}            
+            checkListenerTimer = new System.Threading.Timer(new TimerCallback(updateListenerStateDisplay), null, 0, 100);
         }
 
         private void frmMain_FormClosing(object sender, FormClosingEventArgs e)
@@ -137,7 +140,72 @@ namespace DaedalusTestApp
             // Signal to async tasks that they need to stop what they're doing and shut down
             comm.Dispose();
         }
+
+        private void cmdSendCommand_Click(object sender, EventArgs e)
+        {
+            // Decrypted packet that we're going to send out
+            DecryptedDaedalusPacket outPacket = new DecryptedDaedalusPacket();
+
+            // Should probably invert this and only allow the fields to be set via a constructor (readonly)
+
+            outPacket.commandType = getDaedalusCommandTypeFromComboBox(cboProtocolCommand);
+            unchecked { outPacket.packetIndex = packetIndex++; }
+            outPacket.command = outPacket.commandType.getCommand();
+            outPacket.commandVersion = Byte.Parse((string)Invoke((Func<object>)(() => txtCommandVersion.Text)));
+            string payloadString = (string)Invoke((Func<object>)(() => txtPacketPayload.Text));
+            byte[] payloadBuffer = GlobalHelpers.GlobalMethods.XXHexStringToByteArray(payloadString.Replace(" ", ""));
+            Dictionary<string, DaedalusGlobal.PayloadElement> payload;
+            DaedalusGlobal.ReturnCodes rc = outPacket.commandType.parsePayload(payloadBuffer, 0, out payload);
+            outPacket.payload = payload;
+            if (rc == DaedalusGlobal.ReturnCodes.Valid)
+            {
+                outPacket.setPacketLengthFieldValue();
+                // At this point the decrypted packet should be ready to go
+
+                // Build encrypted packet here
+                EncryptedDaedalusPacket encPacket = new EncryptedDaedalusPacket(outPacket, AESKey);
+
+                string IPString = (string)Invoke((Func<object>)(() => txtDestinationIP.Text));
+                IPEndPoint destinationEndPoint = new IPEndPoint(IPAddress.Parse(IPString), DaedalusGlobal.DaedalusPort);
+                lock (commLocker)
+                {
+                    comm.outPackets.Add(new NetPacket
+                    {
+                        destination = destinationEndPoint,
+                        source = null,
+                        transportType = TransportType.Tcp,
+                        payload = encPacket.toByteBuffer()
+                    });
+                }
+            }
+            else
+            {
+                throw new ArgumentException("Packet payload incorrectly formatted for this command type.");
+            }
+        }
         #endregion
+
+        #region private methods
+
+        private void updateListenerStateDisplay(object state)
+        {
+            lock (commLocker)
+            {
+                bool isListening = comm.isListening();
+                if (isListening != lastListeningState)
+                {
+                    if (isListening)
+                    {
+                        BeginInvoke((Action)(() => cmdToggleListen.BackColor = listening));
+                    }
+                    else
+                    {
+                        BeginInvoke((Action)(() => cmdToggleListen.BackColor = notListening));
+                    }
+                    lastListeningState = isListening;
+                }
+            }
+        }
 
         private void packetProcessingSequence(NetPacket packet)
         {
@@ -156,8 +224,9 @@ namespace DaedalusTestApp
                     DecryptedDaedalusPacket decPacket = new DecryptedDaedalusPacket(encPacket.decryptedPayload, packetStart, packetLength, out rc);
 
                     // Resolve the command type of this packet
-                    IDaedalusCommandType commandType = DecryptedDaedalusPacket.commandTypes.Where(p => p.getCommandType() == decPacket.command).First();
-                    
+                    IDaedalusCommandType commandType = decPacket.commandType;
+                    //IDaedalusCommandType commandType = DecryptedDaedalusPacket.commandTypes.Where(p => p.getCommandType() == decPacket.command).First();
+
                     // I don't really like passing the whole form as a parameter, but it was either that, a huge list of parameters, or a big switch statement here
                     commandType.processAction(decPacket, this, packet.source);
                 }
@@ -222,28 +291,43 @@ namespace DaedalusTestApp
 
         private void cmdToggleListen_Click(object sender, EventArgs e)
         {
-            comm.toggleListen();
+            lock (commLocker)
+            {
+                comm.toggleListen();
+            }
         }
 
         private void cmdDefinePacketPayload_Click(object sender, EventArgs e)
         {
-            // Get the currently selected comboboxitem
-            // I would be interested in a more generic-friendly way of doing this
-            DaedalusCommand_ComboBoxEnumItem selectedCommand = (DaedalusCommand_ComboBoxEnumItem)Invoke((Func<object>)(() => cboProtocolCommand.SelectedItem));
-            IDaedalusCommandType commandInterface = DecryptedDaedalusPacket.commandTypes.Where(p => p.getCommandType() == selectedCommand.enumValue).First();
+            IDaedalusCommandType commandInterface = getDaedalusCommandTypeFromComboBox(cboProtocolCommand);
 
             byte[] payload;
             // If we were able to successfully get a payload value...
             if (commandInterface.showPayloadDefinitionForm(this, out payload))
             {
                 // Stick our payload into the UI
-                Invoke((Action)(() => txtPacketContent.Text = GlobalHelpers.GlobalMethods.BufferToHexString(payload, 0, payload.Length, " ")));
+                Invoke((Action)(() => txtPacketPayload.Text = GlobalHelpers.GlobalMethods.BufferToHexString(payload, 0, payload.Length, " ")));
             }
             else
             {
                 // Blank out the payload
-                Invoke((Action)(() => txtPacketContent.Text = ""));
+                Invoke((Action)(() => txtPacketPayload.Text = ""));
             }
         }
+
+        /// <summary>
+        /// Parses the IdaedalusCommandType from the selected combo box, assuming the combo box 
+        /// is filled with DaedalusCommand_ComboBoxEnumItems
+        /// </summary>
+        /// <param name="box"></param>
+        /// <returns></returns>
+        private IDaedalusCommandType getDaedalusCommandTypeFromComboBox(ComboBox box)
+        {
+            // Get the currently selected comboboxitem
+            // I would be interested in a more generic-friendly way of doing this
+            DaedalusCommand_ComboBoxEnumItem selectedCommand = (DaedalusCommand_ComboBoxEnumItem)Invoke((Func<object>)(() => box.SelectedItem));
+            return DecryptedDaedalusPacket.commandTypes.Where(p => p.getCommand() == selectedCommand.enumValue).First();
+        }
+        #endregion
     }
 }
