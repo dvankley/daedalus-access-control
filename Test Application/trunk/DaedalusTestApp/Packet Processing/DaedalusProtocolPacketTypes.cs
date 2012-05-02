@@ -37,7 +37,7 @@ namespace DaedalusTestApp
         /// <param name="outputBuffer">Buffer to output to. The byte array passed in will be replaced by a new array
         /// of the appropriate size.</param>
         /// <returns></returns>
-        DaedalusGlobal.ReturnCodes payloadToByteBuffer(Dictionary<string, DaedalusGlobal.PayloadElement> payload, ref byte[] outputBuffer);
+        DaedalusGlobal.ReturnCodes payloadToByteBuffer(Dictionary<string, DaedalusGlobal.PayloadElement> payload, out byte[] outputBuffer);
 
         ushort getPayloadLength(Dictionary<string, DaedalusGlobal.PayloadElement> payload);
 
@@ -112,7 +112,7 @@ namespace DaedalusTestApp
             return returnCode;
         }
 
-        public DaedalusGlobal.ReturnCodes payloadToByteBuffer(Dictionary<string, DaedalusGlobal.PayloadElement> payload, ref byte[] outputBuffer)
+        public DaedalusGlobal.ReturnCodes payloadToByteBuffer(Dictionary<string, DaedalusGlobal.PayloadElement> payload, out byte[] outputBuffer)
         {            
             if (payload == null)
             {
@@ -135,6 +135,7 @@ namespace DaedalusTestApp
             }
             else
             {
+                outputBuffer = null;
                 return DaedalusGlobal.ReturnCodes.PayloadFieldMissing;
             }
 

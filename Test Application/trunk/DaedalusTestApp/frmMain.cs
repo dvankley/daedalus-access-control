@@ -287,6 +287,8 @@ namespace DaedalusTestApp
             DaedalusProtocolTests_EncryptAndDecryptPacket test2 = new DaedalusProtocolTests_EncryptAndDecryptPacket();
             test2.BuildEncryptedPacketFromDecryptedPacketSuccess();
             test2.BuildEncryptedPacketFromEncryptedBufferSuccess();
+            DaedalusProtocolTests_ToByteBufferAndBack test3 = new DaedalusProtocolTests_ToByteBufferAndBack();
+            test3.EncryptedPacketToByteBufferCheck();
         }
 
         private void cmdToggleListen_Click(object sender, EventArgs e)

@@ -257,9 +257,8 @@ namespace DaedalusTestApp
 
             // Select the first of the packet types (should only be one) that match the type of this command
             IEnumerable<IDaedalusCommandType> commandTypeMatches = commandTypes.Where(p => p.getCommand() == command);
-
-            // This will be reassigned by payloadToByteBuffer
-            byte[] payloadBuffer = new byte[1];
+            
+            byte[] payloadBuffer;
 
             // Parse this packet's payload
             if (commandTypeMatches.Count() == 0)
@@ -276,7 +275,7 @@ namespace DaedalusTestApp
                 //IDaedalusCommandType commandType = commandTypeMatches.First();
                 this.commandType = commandTypeMatches.First();
 
-                commandType.payloadToByteBuffer(this.payload, ref payloadBuffer);
+                commandType.payloadToByteBuffer(this.payload, out payloadBuffer);
             }
 
             // I think this will return the sum of all the elementSize properties of each payloadElement in payload...
@@ -340,6 +339,7 @@ namespace DaedalusTestApp
     {
         #region Packet Elements
         internal readonly static DaedalusGlobal.PacketElement elementSTX = new DaedalusGlobal.PacketElement("STX", 1, 0, -1);
+        internal readonly static DaedalusGlobal.PacketElement elementSOH = new DaedalusGlobal.PacketElement("SOH", 1, 0, -1);
         internal readonly static DaedalusGlobal.PacketElement elementPacketLength = new DaedalusGlobal.PacketElement("packetLength", 2, 1, -1);
 
         internal readonly static DaedalusGlobal.PacketElement elementEncryptedPacket = new DaedalusGlobal.PacketElement("encryptedPacket", -1, 3, -1);
@@ -352,8 +352,8 @@ namespace DaedalusTestApp
         internal string encryptionKey { get; set; }
         internal int encryptedPacketLength { get; set; }
         private byte[] _encryptedPayload;
-        internal byte[] encryptedPayload 
-        { 
+        internal byte[] encryptedPayload
+        {
             // Implements lazy loading (encrypting/decrypting) for encrypted and decrypted forms
             // of the Daedalus packet on demand
             get
@@ -383,15 +383,16 @@ namespace DaedalusTestApp
                 {
                     return _encryptedPayload;
                 }
-            } 
+            }
             set
             {
-                _encryptedPayload = value;   
-            } 
+                _encryptedPayload = value;
+                encryptedPacketLength = elementETX.ElementSize + value.Length;
+            }
         }
         private byte[] _decryptedPayload;
-        internal byte[] decryptedPayload 
-        {    
+        internal byte[] decryptedPayload
+        {
             // Implements lazy loading (encrypting/decrypting) for encrypted and decrypted forms
             // of the Daedalus packet on demand
             get
@@ -421,11 +422,11 @@ namespace DaedalusTestApp
                 {
                     return _decryptedPayload;
                 }
-            } 
+            }
             set
             {
-                _decryptedPayload = value;   
-            } 
+                _decryptedPayload = value;
+            }
         }
         //private DecryptedDaedalusPacket _clearPacket;
         //internal DecryptedDaedalusPacket clearPacket { get; set; }
@@ -471,7 +472,7 @@ namespace DaedalusTestApp
 
             // Copy the decrypted packet into the local byte buffer
             decryptedPayload = new byte[inPacket.getTotalPacketLength()];
-            Array.Copy(inPacket.toByteBuffer(), decryptedPayload, inPacket.getTotalPacketLength()); 
+            Array.Copy(inPacket.toByteBuffer(), decryptedPayload, inPacket.getTotalPacketLength());
         }
 
         #endregion
@@ -577,8 +578,37 @@ namespace DaedalusTestApp
 
         internal byte[] toByteBuffer()
         {
-            // To do
-            return new byte[] { };
+            // Initialize the output buffer we're going to build our packet in
+            byte[] outBuffer = new byte[this.getTotalPacketLength()];
+            ushort packetLengthFieldValue = (ushort)this.getPacketLengthFieldValue();
+            outBuffer[elementSOH.ElementStaticOffset] = GlobalConstants.SOH;
+
+            // Copy in the encrypted payload
+            Array.Copy(this.encryptedPayload, 0, outBuffer, elementEncryptedPacket.ElementStaticOffset, this.encryptedPayload.Length);
+
+            // Do packetLength now because we actually know the length now
+            Array.Copy(BitConverter.GetBytes(packetLengthFieldValue), 0, outBuffer, elementPacketLength.ElementStaticOffset, elementPacketLength.ElementSize);
+
+            outBuffer[elementETX.ElementVariableOffset + encryptedPayload.Length] = GlobalConstants.ETX;
+
+            // Calculate CRC from content of input packet, STX to ETX, inclusive
+            ushort CRCCalc = CRC16.calc_crc(outBuffer, 0, (elementSTX.ElementSize + elementPacketLength.ElementSize + packetLengthFieldValue));
+
+            Array.Copy(BitConverter.GetBytes(CRCCalc), 0, outBuffer, elementCRC.ElementVariableOffset + encryptedPayload.Length, elementCRC.ElementSize);
+
+            outBuffer[elementEOT.ElementVariableOffset + encryptedPayload.Length] = GlobalConstants.EOT;
+
+            return outBuffer;
+        }
+
+        internal int getTotalPacketLength()
+        {
+            return (encryptedPacketLength + elementSOH.ElementSize + elementPacketLength.ElementSize + elementCRC.ElementSize + elementEOT.ElementSize);
+        }
+
+        internal int getPacketLengthFieldValue()
+        {
+            return encryptedPacketLength;
         }
         #endregion
     }
