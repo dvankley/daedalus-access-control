@@ -10,6 +10,10 @@ using System.Net.Sockets;
 
 namespace DaedalusTestApp.Comms
 {
+    /// <summary>
+    /// Handles TCP communications using TPL Tasks.
+    /// All methods are required to be thread safe.
+    /// </summary>
     internal class TPLTCPQueuedComm : IDisposable
     {
         internal const int TCPResponseTimeoutMS = 30000;
@@ -34,12 +38,13 @@ namespace DaedalusTestApp.Comms
         internal isValidPacket validator;
         internal processPacket processor;
 
-        public TPLTCPQueuedComm(isValidPacket validator, processPacket processor)
+        public TPLTCPQueuedComm(isValidPacket validator, processPacket processor, IPAddress listenerIPAddress, ushort networkPort)
         {
             // Start comms processing tasks
             txTask = Task.Factory.StartNew(x => networkTxTask(clientTokenSource.Token), "networkTxTask", TaskCreationOptions.LongRunning);
             rxTask = Task.Factory.StartNew(x => networkRxTask(clientTokenSource.Token), "networkRxTask", TaskCreationOptions.LongRunning);
-            rxListenerTask = Task.Factory.StartNew(x => networkRxListenerTask(listenerTokenSource.Token), "networkRxListenerTask", TaskCreationOptions.LongRunning);
+            rxListenerTask = Task.Factory.StartNew(x => networkRxListenerTask(listenerTokenSource.Token, listenerIPAddress, networkPort), 
+                "networkRxListenerTask", TaskCreationOptions.LongRunning);
 
             this.validator = validator;
             this.processor = processor;
@@ -51,7 +56,7 @@ namespace DaedalusTestApp.Comms
             return rxListenerTask.Status == TaskStatus.Running;
         }
 
-        public bool toggleListen()
+        public bool toggleListen(IPAddress listenerIPAddress, ushort networkPort)
         {
             if (isListening())
             {
@@ -60,7 +65,8 @@ namespace DaedalusTestApp.Comms
             else
             {
                 listenerTokenSource = new CancellationTokenSource();
-                rxListenerTask = Task.Factory.StartNew(x => networkRxListenerTask(listenerTokenSource.Token), "networkRxListenerTask", TaskCreationOptions.LongRunning);
+                rxListenerTask = Task.Factory.StartNew(x => networkRxListenerTask(listenerTokenSource.Token, listenerIPAddress, networkPort), 
+                    "networkRxListenerTask", TaskCreationOptions.LongRunning);
             }
 
             return isListening();
@@ -72,12 +78,10 @@ namespace DaedalusTestApp.Comms
         /// Responsible for managing the listener socket
         /// </summary>
         /// <param name="cancelToken"></param>
-        private void networkRxListenerTask(CancellationToken cancelToken)
+        private void networkRxListenerTask(CancellationToken cancelToken, IPAddress listenerIPAddress, ushort networkPort)
         {
-            IPAddress localAddr = IPAddress.Parse("192.168.1.99");
-
             // TcpListener server = new TcpListener(port);
-            TcpListener server = new TcpListener(localAddr, DaedalusGlobal.DaedalusPort);
+            TcpListener server = new TcpListener(listenerIPAddress, networkPort);
 
             // Start listening for client requests.
             server.Start();
