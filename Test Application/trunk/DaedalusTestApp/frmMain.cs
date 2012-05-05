@@ -13,6 +13,7 @@ using System.Threading.Tasks;
 using System.Collections.Concurrent;
 using GlobalHelpers;
 using DaedalusTestApp.Comms;
+using System.Net.NetworkInformation;
 
 
 namespace DaedalusTestApp
@@ -33,6 +34,10 @@ namespace DaedalusTestApp
         System.Threading.Timer checkListenerTimer;
 
         CancellationTokenSource packetProcessingTokenSource = new CancellationTokenSource();
+
+        object selectedNetworkInterfaceLocker = new object();
+        NetworkInterface selectedNetworkInterface;
+
         #region Delegates
         //public delegate void UIDelegate (object UIArg);
         //public delegate void LogDelegate (string input);
@@ -115,8 +120,6 @@ namespace DaedalusTestApp
         {
             txtAESKey.Text = "AESKey";
 
-            comm = new TPLTCPQueuedComm(validatePacket, processNewNetPacket);
-
             // Fill the combo box with the string representations of the command enums
             List<DaedalusCommand_ComboBoxEnumItem> commandItems = DecryptedDaedalusPacket.commandTypes.Select(x => new DaedalusCommand_ComboBoxEnumItem()
             {
@@ -131,6 +134,21 @@ namespace DaedalusTestApp
 
             // Select the first entry
             cboProtocolCommand.SelectedIndex = 0;
+
+            // Get network interfaces
+            List<NetworkInterface> activeNetworkInterfaces = getActiveNetworkInterfaces();
+
+            lock (selectedNetworkInterfaceLocker)
+            {
+                // Select the first interface by default
+                selectedNetworkInterface = activeNetworkInterfaces[0];
+
+                // Initialize the comm object with the end point from the selected network interface
+                comm = new TPLTCPQueuedComm(validatePacket, processNewNetPacket,
+                    getDefaultIPv4AddressFromInterface(selectedNetworkInterface), DaedalusGlobal.DaedalusPort);
+            }
+
+            updateSelectedInterfaceDisplay();
 
             checkListenerTimer = new System.Threading.Timer(new TimerCallback(updateListenerStateDisplay), null, 0, 100);
         }
@@ -167,30 +185,90 @@ namespace DaedalusTestApp
 
                 string IPString = (string)Invoke((Func<object>)(() => txtDestinationIP.Text));
                 IPEndPoint destinationEndPoint = new IPEndPoint(IPAddress.Parse(IPString), DaedalusGlobal.DaedalusPort);
-                lock (commLocker)
+                //lock (commLocker)
+                //{
+                lock (selectedNetworkInterfaceLocker)
                 {
                     comm.outPackets.Add(new NetPacket
                     {
                         destination = destinationEndPoint,
-                        source = null,
+                        source = new IPEndPoint(getDefaultIPv4AddressFromInterface(selectedNetworkInterface), DaedalusGlobal.DaedalusPort),
                         transportType = TransportType.Tcp,
                         payload = encPacket.toByteBuffer()
                     });
                 }
+                //}
             }
             else
             {
                 throw new ArgumentException("Packet payload incorrectly formatted for this command type.");
             }
         }
+
+        private void button1_Click(object sender, EventArgs e)
+        {
+            DaedalusProtocolTests_ConstructDecryptedPacketFromBytes test1 = new DaedalusProtocolTests_ConstructDecryptedPacketFromBytes();
+            test1.PayloadParseCommandNotImplemented();
+            test1.PayloadParseSuccess();
+            DaedalusProtocolTests_EncryptAndDecryptPacket test2 = new DaedalusProtocolTests_EncryptAndDecryptPacket();
+            test2.BuildEncryptedPacketFromDecryptedPacketSuccess();
+            test2.BuildEncryptedPacketFromEncryptedBufferSuccess();
+            DaedalusProtocolTests_ToByteBufferAndBack test3 = new DaedalusProtocolTests_ToByteBufferAndBack();
+            test3.EncryptedPacketToByteBufferCheck();
+        }
+
+        /// <summary>
+        /// Toggles the listening state of the application's socket listener.
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void cmdToggleListen_Click(object sender, EventArgs e)
+        {
+            // Deadlock note: nested lock
+            //lock (commLocker)
+            //{
+                lock (selectedNetworkInterfaceLocker)
+                {
+                    comm.toggleListen(getDefaultIPv4AddressFromInterface(selectedNetworkInterface), DaedalusGlobal.DaedalusPort);                    
+                }
+            //}
+        }
+
+        private void cmdSelectNetworkInterface_Click(object sender, EventArgs e)
+        {
+            if (comm.isListening())
+            {
+                Invoke(((Action)(() => MessageBox.Show("Please toggle the socket listener off before attempting to change the active network interface."))));
+            }
+            else
+            {
+                List<NetworkInterface> interfaces = getActiveNetworkInterfaces();
+                using (frmSelectNetworkInterface form = new frmSelectNetworkInterface(interfaces))
+                {
+                    if (form.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                    {
+                        lock (selectedNetworkInterfaceLocker)
+                        {
+                            selectedNetworkInterface = form.selectedNetworkInterface;
+                            updateSelectedInterfaceDisplay();
+                        }
+                    }
+                }
+            }
+        }
         #endregion
 
         #region private methods
 
+        /// <summary>
+        /// Timer callback to update the status display of the "Toggle Listen" button to indicate 
+        /// if the application's socket listener is currently active.
+        /// </summary>
+        /// <param name="state">Null timer callback state object</param>
         private void updateListenerStateDisplay(object state)
         {
-            lock (commLocker)
-            {
+            //lock (commLocker)
+            //{
                 bool isListening = comm.isListening();
                 if (isListening != lastListeningState)
                 {
@@ -204,7 +282,7 @@ namespace DaedalusTestApp
                     }
                     lastListeningState = isListening;
                 }
-            }
+            //}
         }
 
         private void packetProcessingSequence(NetPacket packet)
@@ -279,26 +357,6 @@ namespace DaedalusTestApp
         //}
         //#endregion
 
-        private void button1_Click(object sender, EventArgs e)
-        {
-            DaedalusProtocolTests_ConstructDecryptedPacketFromBytes test1 = new DaedalusProtocolTests_ConstructDecryptedPacketFromBytes();
-            test1.PayloadParseCommandNotImplemented();
-            test1.PayloadParseSuccess();
-            DaedalusProtocolTests_EncryptAndDecryptPacket test2 = new DaedalusProtocolTests_EncryptAndDecryptPacket();
-            test2.BuildEncryptedPacketFromDecryptedPacketSuccess();
-            test2.BuildEncryptedPacketFromEncryptedBufferSuccess();
-            DaedalusProtocolTests_ToByteBufferAndBack test3 = new DaedalusProtocolTests_ToByteBufferAndBack();
-            test3.EncryptedPacketToByteBufferCheck();
-        }
-
-        private void cmdToggleListen_Click(object sender, EventArgs e)
-        {
-            lock (commLocker)
-            {
-                comm.toggleListen();
-            }
-        }
-
         private void cmdDefinePacketPayload_Click(object sender, EventArgs e)
         {
             IDaedalusCommandType commandInterface = getDaedalusCommandTypeFromComboBox(cboProtocolCommand);
@@ -329,6 +387,56 @@ namespace DaedalusTestApp
             // I would be interested in a more generic-friendly way of doing this
             DaedalusCommand_ComboBoxEnumItem selectedCommand = (DaedalusCommand_ComboBoxEnumItem)Invoke((Func<object>)(() => box.SelectedItem));
             return DecryptedDaedalusPacket.commandTypes.Where(p => p.getCommand() == selectedCommand.enumValue).First();
+        }
+
+        #region Network Methods
+        private List<NetworkInterface> getActiveNetworkInterfaces()
+        {
+            return NetworkInterface.GetAllNetworkInterfaces().Where(x =>
+                (NetworkInterface.GetIsNetworkAvailable() &&
+                (x.OperationalStatus == OperationalStatus.Up) &&
+                ((x.NetworkInterfaceType == NetworkInterfaceType.Ethernet) || (x.NetworkInterfaceType == NetworkInterfaceType.GigabitEthernet))
+                )).ToList();
+        }
+
+        private void updateSelectedInterfaceDisplay()
+        {
+            lock (selectedNetworkInterfaceLocker)
+            {
+                string text = selectedNetworkInterface.Name + ":" + getDefaultIPv4AddressFromInterface(selectedNetworkInterface).ToString();
+
+                if (lblSelectedInterface.InvokeRequired)
+                {
+                    Invoke(((Action)(() => lblSelectedInterface.Text = text)));
+                }
+                else
+                {
+                    lblSelectedInterface.Text = text;
+                }
+            }
+        }
+
+
+        ///// <summary>
+        ///// Displays a form to the user to select a network interface from a list of
+        ///// active interfaces.
+        ///// Should only be called on the UI thread.
+        ///// </summary>
+        ///// <returns>Selected network interface object.</returns>
+        //private NetworkInterface getUserNetworkInterfaceSelection(List<NetworkInterface> activeNetworkInterfaces)
+        //{
+
+        //}
+        #endregion
+        #endregion
+
+        #region Public methods
+        public static IPAddress getDefaultIPv4AddressFromInterface(NetworkInterface netInterface)
+        {
+            return netInterface.GetIPProperties().UnicastAddresses.Where(x => (
+                           (!IPAddress.IsLoopback(x.Address)) &&
+                           (x.Address.AddressFamily == AddressFamily.InterNetwork)
+                            )).First().Address;
         }
         #endregion
     }

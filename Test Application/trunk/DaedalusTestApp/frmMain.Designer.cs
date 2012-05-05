@@ -30,6 +30,7 @@
         {
             this.tabControl1 = new System.Windows.Forms.TabControl();
             this.ProtocolTester = new System.Windows.Forms.TabPage();
+            this.txtCommandVersion = new System.Windows.Forms.TextBox();
             this.label8 = new System.Windows.Forms.Label();
             this.cmdSendCommand = new System.Windows.Forms.Button();
             this.label6 = new System.Windows.Forms.Label();
@@ -49,18 +50,22 @@
             this.lstTraffic = new System.Windows.Forms.ListBox();
             this.groupBox1 = new System.Windows.Forms.GroupBox();
             this.cmdToggleListen = new System.Windows.Forms.Button();
-            this.txtCommandVersion = new System.Windows.Forms.TextBox();
+            this.cmdSelectNetworkInterface = new System.Windows.Forms.Button();
+            this.groupBox2 = new System.Windows.Forms.GroupBox();
+            this.lblSelectedInterface = new System.Windows.Forms.Label();
+            this.label5 = new System.Windows.Forms.Label();
             this.tabControl1.SuspendLayout();
             this.ProtocolTester.SuspendLayout();
             this.AccessControl.SuspendLayout();
             this.groupBox1.SuspendLayout();
+            this.groupBox2.SuspendLayout();
             this.SuspendLayout();
             // 
             // tabControl1
             // 
             this.tabControl1.Controls.Add(this.ProtocolTester);
             this.tabControl1.Controls.Add(this.AccessControl);
-            this.tabControl1.Location = new System.Drawing.Point(12, 51);
+            this.tabControl1.Location = new System.Drawing.Point(12, 99);
             this.tabControl1.Name = "tabControl1";
             this.tabControl1.SelectedIndex = 0;
             this.tabControl1.Size = new System.Drawing.Size(984, 237);
@@ -85,6 +90,14 @@
             this.ProtocolTester.Size = new System.Drawing.Size(976, 211);
             this.ProtocolTester.TabIndex = 1;
             this.ProtocolTester.Text = "Omega Protocol Tester";
+            // 
+            // txtCommandVersion
+            // 
+            this.txtCommandVersion.Location = new System.Drawing.Point(362, 32);
+            this.txtCommandVersion.Name = "txtCommandVersion";
+            this.txtCommandVersion.Size = new System.Drawing.Size(89, 20);
+            this.txtCommandVersion.TabIndex = 12;
+            this.txtCommandVersion.Text = "1";
             // 
             // label8
             // 
@@ -205,7 +218,7 @@
             // 
             // button1
             // 
-            this.button1.Location = new System.Drawing.Point(530, 22);
+            this.button1.Location = new System.Drawing.Point(144, 22);
             this.button1.Name = "button1";
             this.button1.Size = new System.Drawing.Size(75, 23);
             this.button1.TabIndex = 12;
@@ -240,7 +253,7 @@
             // groupBox1
             // 
             this.groupBox1.Controls.Add(this.lstTraffic);
-            this.groupBox1.Location = new System.Drawing.Point(12, 294);
+            this.groupBox1.Location = new System.Drawing.Point(12, 342);
             this.groupBox1.Name = "groupBox1";
             this.groupBox1.Size = new System.Drawing.Size(984, 209);
             this.groupBox1.TabIndex = 4;
@@ -249,29 +262,61 @@
             // 
             // cmdToggleListen
             // 
-            this.cmdToggleListen.Location = new System.Drawing.Point(302, 23);
+            this.cmdToggleListen.Location = new System.Drawing.Point(33, 19);
             this.cmdToggleListen.Name = "cmdToggleListen";
-            this.cmdToggleListen.Size = new System.Drawing.Size(99, 23);
+            this.cmdToggleListen.Size = new System.Drawing.Size(122, 23);
             this.cmdToggleListen.TabIndex = 7;
             this.cmdToggleListen.Text = "Toggle Listen";
             this.cmdToggleListen.UseVisualStyleBackColor = true;
             this.cmdToggleListen.Click += new System.EventHandler(this.cmdToggleListen_Click);
             // 
-            // txtCommandVersion
+            // cmdSelectNetworkInterface
             // 
-            this.txtCommandVersion.Location = new System.Drawing.Point(362, 32);
-            this.txtCommandVersion.Name = "txtCommandVersion";
-            this.txtCommandVersion.Size = new System.Drawing.Size(89, 20);
-            this.txtCommandVersion.TabIndex = 12;
-            this.txtCommandVersion.Text = "1";
+            this.cmdSelectNetworkInterface.Location = new System.Drawing.Point(211, 19);
+            this.cmdSelectNetworkInterface.Name = "cmdSelectNetworkInterface";
+            this.cmdSelectNetworkInterface.Size = new System.Drawing.Size(161, 23);
+            this.cmdSelectNetworkInterface.TabIndex = 13;
+            this.cmdSelectNetworkInterface.Text = "Select Network Interface";
+            this.cmdSelectNetworkInterface.UseVisualStyleBackColor = true;
+            this.cmdSelectNetworkInterface.Click += new System.EventHandler(this.cmdSelectNetworkInterface_Click);
+            // 
+            // groupBox2
+            // 
+            this.groupBox2.Controls.Add(this.lblSelectedInterface);
+            this.groupBox2.Controls.Add(this.label5);
+            this.groupBox2.Controls.Add(this.cmdToggleListen);
+            this.groupBox2.Controls.Add(this.cmdSelectNetworkInterface);
+            this.groupBox2.Location = new System.Drawing.Point(610, 12);
+            this.groupBox2.Name = "groupBox2";
+            this.groupBox2.Size = new System.Drawing.Size(386, 81);
+            this.groupBox2.TabIndex = 14;
+            this.groupBox2.TabStop = false;
+            this.groupBox2.Text = "Network Configuration";
+            // 
+            // lblSelectedInterface
+            // 
+            this.lblSelectedInterface.AutoSize = true;
+            this.lblSelectedInterface.Location = new System.Drawing.Point(110, 54);
+            this.lblSelectedInterface.Name = "lblSelectedInterface";
+            this.lblSelectedInterface.Size = new System.Drawing.Size(0, 13);
+            this.lblSelectedInterface.TabIndex = 15;
+            // 
+            // label5
+            // 
+            this.label5.AutoSize = true;
+            this.label5.Location = new System.Drawing.Point(6, 54);
+            this.label5.Name = "label5";
+            this.label5.Size = new System.Drawing.Size(97, 13);
+            this.label5.TabIndex = 14;
+            this.label5.Text = "Selected Interface:";
             // 
             // frmMain
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(1008, 517);
+            this.ClientSize = new System.Drawing.Size(1008, 563);
+            this.Controls.Add(this.groupBox2);
             this.Controls.Add(this.button1);
-            this.Controls.Add(this.cmdToggleListen);
             this.Controls.Add(this.groupBox1);
             this.Controls.Add(this.label3);
             this.Controls.Add(this.txtAESKey);
@@ -286,6 +331,8 @@
             this.AccessControl.ResumeLayout(false);
             this.AccessControl.PerformLayout();
             this.groupBox1.ResumeLayout(false);
+            this.groupBox2.ResumeLayout(false);
+            this.groupBox2.PerformLayout();
             this.ResumeLayout(false);
             this.PerformLayout();
 
@@ -316,6 +363,10 @@
         private System.Windows.Forms.Button cmdToggleListen;
         private System.Windows.Forms.Button button1;
         private System.Windows.Forms.TextBox txtCommandVersion;
+        private System.Windows.Forms.Button cmdSelectNetworkInterface;
+        private System.Windows.Forms.GroupBox groupBox2;
+        private System.Windows.Forms.Label lblSelectedInterface;
+        private System.Windows.Forms.Label label5;
     }
 }
 

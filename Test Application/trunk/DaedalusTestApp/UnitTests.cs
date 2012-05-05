@@ -221,6 +221,10 @@ namespace DaedalusTestApp
 
             // Build encrypted packet from the decrypted packet
             EncryptedDaedalusPacket encryptedPacket1 = new EncryptedDaedalusPacket(packet, TestHelpers.goodAESKey);
+
+            byte[] encryptedBuffer1 = encryptedPacket1.toByteBuffer();
+            Assert.IsTrue(encryptedBuffer1.Length > testPacket.Length);
+
             Assert.IsNotNull(encryptedPacket1);          
             byte[] encryptedPayload = encryptedPacket1.encryptedPayload;
             Assert.IsNotNull(encryptedPayload);

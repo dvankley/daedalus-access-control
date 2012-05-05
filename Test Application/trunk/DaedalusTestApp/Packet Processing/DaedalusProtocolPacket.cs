@@ -350,7 +350,7 @@ namespace DaedalusTestApp
 
         #region Instance Variables
         internal string encryptionKey { get; set; }
-        internal int encryptedPacketLength { get; set; }
+        internal int encryptedPacketLengthFieldValue { get; set; }
         private byte[] _encryptedPayload;
         internal byte[] encryptedPayload
         {
@@ -387,7 +387,7 @@ namespace DaedalusTestApp
             set
             {
                 _encryptedPayload = value;
-                encryptedPacketLength = elementETX.ElementSize + value.Length;
+                encryptedPacketLengthFieldValue = elementETX.ElementSize + value.Length;
             }
         }
         private byte[] _decryptedPayload;
@@ -450,15 +450,18 @@ namespace DaedalusTestApp
             encryptionKey = AESkey;
 
             // Parse packet elements
-            encryptedPacketLength = BitConverter.ToUInt16(inBuffer, elementPacketLength.ElementStaticOffset + startIndex);
+            encryptedPacketLengthFieldValue = BitConverter.ToUInt16(inBuffer, elementPacketLength.ElementStaticOffset + startIndex);
 
             // Copy encrypted payload to internal object
-            encryptedPayload = new byte[startIndex + encryptedPacketLength - elementETX.ElementSize];
-            Array.Copy(inBuffer, startIndex + elementEncryptedPacket.ElementStaticOffset, encryptedPayload, 0, encryptedPacketLength - elementETX.ElementSize);
+            encryptedPayload = new byte[startIndex + encryptedPacketLengthFieldValue - elementETX.ElementSize];
+            Array.Copy(inBuffer, startIndex + elementEncryptedPacket.ElementStaticOffset, encryptedPayload, 0, encryptedPacketLengthFieldValue - elementETX.ElementSize);
 
             // Decrypt <encryptedPacket>
-            decryptedPayload = Convert.FromBase64String(AesEncryptamajig.Decrypt(Convert.ToBase64String(
-                encryptedPayload), AESkey));
+            //decryptedPayload = Convert.FromBase64String(AesEncryptamajig.Decrypt(Convert.ToBase64String(
+            //    encryptedPayload), AESkey));
+
+            // Force accessor to perform decryption operation and sync payloads
+            byte[] temp = decryptedPayload;
 
             returnCode = DaedalusGlobal.ReturnCodes.Valid;
         }
@@ -467,12 +470,19 @@ namespace DaedalusTestApp
         {
             encryptionKey = AESKey;
 
-            // The decrypted packet's entire size is the payload of the encrypted packet, so the <encryptedPacketLength> is that + size of ETX
-            encryptedPacketLength = inPacket.getTotalPacketLength() + elementETX.ElementSize;
+            // Not at all like that
+            //// The decrypted packet's entire size is the payload of the encrypted packet, so the <encryptedPacketLength> is that + size of ETX
+            //encryptedPacketLength = inPacket.getTotalPacketLength() + elementETX.ElementSize;
 
             // Copy the decrypted packet into the local byte buffer
             decryptedPayload = new byte[inPacket.getTotalPacketLength()];
             Array.Copy(inPacket.toByteBuffer(), decryptedPayload, inPacket.getTotalPacketLength());
+
+            // Force accessor to perform encryption operation and synch payloads
+            //byte[] temp = encryptedPayload;
+
+            // Packet length field is payload length plus length of ETX
+            encryptedPacketLengthFieldValue = encryptedPayload.Length + elementETX.ElementSize;
         }
 
         #endregion
@@ -603,12 +613,12 @@ namespace DaedalusTestApp
 
         internal int getTotalPacketLength()
         {
-            return (encryptedPacketLength + elementSOH.ElementSize + elementPacketLength.ElementSize + elementCRC.ElementSize + elementEOT.ElementSize);
+            return (encryptedPacketLengthFieldValue + elementSOH.ElementSize + elementPacketLength.ElementSize + elementCRC.ElementSize + elementEOT.ElementSize);
         }
 
         internal int getPacketLengthFieldValue()
         {
-            return encryptedPacketLength;
+            return encryptedPacketLengthFieldValue;
         }
         #endregion
     }
