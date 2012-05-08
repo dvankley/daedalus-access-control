@@ -7,6 +7,7 @@ using System.Collections.Concurrent;
 using System.Threading;
 using System.Net;
 using System.Net.Sockets;
+using System.IO;
 
 namespace DaedalusTestApp.Comms
 {
@@ -16,7 +17,7 @@ namespace DaedalusTestApp.Comms
     /// </summary>
     internal class TPLTCPQueuedComm : IDisposable
     {
-        internal const int TCPResponseTimeoutMS = 30000;
+        internal const int TCPResponseTimeoutMS = 10000;
 
         internal const uint packetBufferSize = 1024;
 
@@ -191,11 +192,13 @@ namespace DaedalusTestApp.Comms
         /// adds the packet to the rxPacketQueue for the main RX task to handle.
         /// </summary>
         /// <param name="tcp">TCP client to look for a response on.</param>
+        /// <param name="cancelToken">Signals this task to finish any current operation and close <paramref name="tcp"/></param>
         private void networkResponseRxTask(TcpClient tcp, CancellationToken cancelToken)
         {
             // Mark when the task started
-            DateTime taskStartTime = DateTime.Now;
+            DateTime lastSocketActivityTime = DateTime.Now;
 
+            // Network stream to read/write on
             NetworkStream stream = tcp.GetStream();
 
             // Buffer to hold the running incoming data stream
@@ -204,16 +207,43 @@ namespace DaedalusTestApp.Comms
             // Temporary buffer to hold the chunk of data read in most recently
             byte[] rxTemp = new byte[networkRxBufferSize];
 
-            // Keep waiting for a response until we time out
-            while (((DateTime.Now - taskStartTime).Milliseconds < TCPResponseTimeoutMS) && (!cancelToken.IsCancellationRequested))
+            // Keep looping through and reading until we either time out or are instructed to cancel
+            while (((DateTime.Now - lastSocketActivityTime).TotalMilliseconds < TCPResponseTimeoutMS) && 
+                (!cancelToken.IsCancellationRequested))
             {
-                // Try to read in data from the network stream
-                int bytesRead = stream.Read(rxTemp, 0, networkRxBufferSize);
+                // The number of bytes most recently read from the network stream
+                int bytesRead = 0;
+
+                try
+                {
+                    // Stream.Read blocks if no data is available (which we don't want) so check for data
+                    // before reading to avoid blocking.
+                    if (stream.DataAvailable)
+                    {
+                        // Try to read in data from the network stream
+                        bytesRead = stream.Read(rxTemp, 0, networkRxBufferSize);
+                    }
+                }
+                catch (IOException)
+                {
+                    // The socket's been forcefully closed on the other end, so we're done here
+                    break;
+                }
+                catch (SocketException)
+                {
+                    // The socket's been forcefully closed on the other end, so we're done here
+                    break;
+                }
 
                 if (bytesRead > 0)
                 {
                     // Add all the bytes that were read into the temporary buffer into the rxBuffer list 
                     rxBuffer.AddRange(rxTemp.Where((item, index) => index < bytesRead));
+                }
+                // If we haven't read any data, make sure the socket's still up
+                else if (!IsConnected(tcp))
+                {
+                    break;
                 }
 
                 // If the temp buffer wasn't big enough to hold all the incoming data, we need to read
@@ -243,6 +273,9 @@ namespace DaedalusTestApp.Comms
                         // Remove the packet and all preceding bytes from the input buffer
                         rxBuffer.RemoveRange(0, packetStart + packetLength);
                     }
+
+                    // Reset the timeout
+                    lastSocketActivityTime = DateTime.Now;
                 }
 
                 // No good way to sleep inside a task... we'll see if this burns too much processor just looping as-is
@@ -251,8 +284,25 @@ namespace DaedalusTestApp.Comms
             }
 
             // If we get here we've either timed out or been ordered to cancel
+            stream.Close();
             tcp.Close();
         }
+
+        /// <summary>
+        /// Send a poll to check if a connection is still active. This is somewhat difficult due to the structure of TCP sockets, i.e.
+        /// http://nitoprograms.blogspot.com/2009/05/detection-of-half-open-dropped.html
+        /// </summary>
+        /// <param name="socket">Socket to check status of.</param>
+        /// <returns>True if the socket's still alive and connected, false otherwise.</returns>
+        private bool IsConnected(TcpClient client)
+        {
+            try
+            {
+                return !(client.Client.Poll(1, SelectMode.SelectRead) && client.Client.Available == 0);
+            }
+            catch (SocketException) { return false; }
+        }
+    
 
         private void addNewRxPacket(TransportType transport, EndPoint d, EndPoint s,
             BlockingCollection<NetPacket> rxPacketQueue, List<PacketRegistryEntry> rxPacketRegistry,
