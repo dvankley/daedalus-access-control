@@ -26,7 +26,6 @@ namespace DaedalusTestApp.Comms
         internal BlockingCollection<NetPacket> outPackets = new BlockingCollection<NetPacket>();
         internal CancellationTokenSource listenerTokenSource = new CancellationTokenSource();
         internal CancellationTokenSource clientTokenSource = new CancellationTokenSource();
-        //public CancellationToken shutdownToken;
         internal List<PacketRegistryEntry> rxPacketWaitRegistry = new List<PacketRegistryEntry>();
 
         internal Task txTask;
@@ -35,11 +34,14 @@ namespace DaedalusTestApp.Comms
 
         internal delegate bool isValidPacket(byte[] bufferArray, out int returnCode, out int packetStart, out int packetLength);
         internal delegate void processPacket(NetPacket packet);
+        internal delegate void exceptionHandler(Exception e);
 
         internal isValidPacket validator;
         internal processPacket processor;
+        internal exceptionHandler exHandler;
 
-        public TPLTCPQueuedComm(isValidPacket validator, processPacket processor, IPAddress listenerIPAddress, ushort networkPort)
+        public TPLTCPQueuedComm(isValidPacket validator, processPacket processor, exceptionHandler exceptionHandler,
+            IPAddress listenerIPAddress, ushort networkPort)
         {
             // Start comms processing tasks
             txTask = Task.Factory.StartNew(x => networkTxTask(clientTokenSource.Token), "networkTxTask", TaskCreationOptions.LongRunning);
@@ -49,6 +51,7 @@ namespace DaedalusTestApp.Comms
 
             this.validator = validator;
             this.processor = processor;
+            this.exHandler = exceptionHandler;
         }
 
         #region Public methods
@@ -81,25 +84,32 @@ namespace DaedalusTestApp.Comms
         /// <param name="cancelToken"></param>
         private void networkRxListenerTask(CancellationToken cancelToken, IPAddress listenerIPAddress, ushort networkPort)
         {
-            // TcpListener server = new TcpListener(port);
-            TcpListener server = new TcpListener(listenerIPAddress, networkPort);
-
-            // Start listening for client requests.
-            server.Start();
-
-            while (!cancelToken.IsCancellationRequested)
+            try
             {
-                // Perform a blocking call to accept requests.
-                // You could also use server.AcceptSocket() here.
-                if (server.Pending())
-                {
-                    TcpClient client = server.AcceptTcpClient();
+                // TcpListener server = new TcpListener(port);
+                TcpListener server = new TcpListener(listenerIPAddress, networkPort);
 
-                    // Hand off the TcpClient to another task to handle any incoming responses
-                    Task.Factory.StartNew(x => networkResponseRxTask(client, cancelToken), "networkResponseRxTask: " + client.Client.RemoteEndPoint.ToString());
+                // Start listening for client requests.
+                server.Start();
+
+                while (!cancelToken.IsCancellationRequested)
+                {
+                    // Perform a blocking call to accept requests.
+                    // You could also use server.AcceptSocket() here.
+                    if (server.Pending())
+                    {
+                        TcpClient client = server.AcceptTcpClient();
+
+                        // Hand off the TcpClient to another task to handle any incoming responses
+                        Task.Factory.StartNew(x => networkResponseRxTask(client, cancelToken), "networkResponseRxTask: " + client.Client.RemoteEndPoint.ToString());
+                    }
                 }
+                server.Stop();
             }
-            server.Stop();
+            catch (SocketException ex)
+            {
+                exHandler(ex);
+            }
         }
 
         /// <summary>
@@ -137,11 +147,12 @@ namespace DaedalusTestApp.Comms
                     // Otherwise nobody is waiting for this packet, so start it processing straight up
                     processor(currentPacket);
                 }
-                catch (OperationCanceledException)
+                catch (OperationCanceledException ex)
                 {
-                    // Swallow the exception and let the task terminate
+                    // Let the task terminate
                     // As of this writing, there was no other solid solution to this issue
                     //http://stackoverflow.com/questions/8953407/using-blockingcollection-operationcanceledexception-is-there-a-better-way
+                    exHandler(ex);
                 }
             }
         }
@@ -154,9 +165,6 @@ namespace DaedalusTestApp.Comms
         {
             while (!cancelToken.IsCancellationRequested)
             {
-                // Build a wrapper around the tx ConcurrentQueue to allow us to make blocking Take calls
-                //BlockingCollection<NetPacket> txQueue = new BlockingCollection<NetPacket>(outPackets);
-
                 try
                 {
                     // Get the next packet to send, blocking until there is a packet available
@@ -172,15 +180,16 @@ namespace DaedalusTestApp.Comms
                     // Hand off the TcpClient to another task to handle any incoming responses
                     Task.Factory.StartNew(x => networkResponseRxTask(tcp, cancelToken), "networkResponseRxTask: " + tcp.Client.RemoteEndPoint.ToString());
                 }
-                catch (OperationCanceledException)
+                catch (OperationCanceledException ex)
                 {
-                    // Swallow the exception and let the task terminate
+                    // Let the task terminate
                     // As of this writing, there was no other solid solution to this issue
                     //http://stackoverflow.com/questions/8953407/using-blockingcollection-operationcanceledexception-is-there-a-better-way
+                    exHandler(ex);
                 }
                 catch (SocketException ex)
                 {
-                    // Swallow for now
+                    exHandler(ex);
                 }
             }
         }
@@ -195,97 +204,104 @@ namespace DaedalusTestApp.Comms
         /// <param name="cancelToken">Signals this task to finish any current operation and close <paramref name="tcp"/></param>
         private void networkResponseRxTask(TcpClient tcp, CancellationToken cancelToken)
         {
-            // Mark when the task started
-            DateTime lastSocketActivityTime = DateTime.Now;
-
-            // Network stream to read/write on
-            NetworkStream stream = tcp.GetStream();
-
-            // Buffer to hold the running incoming data stream
-            List<byte> rxBuffer = new List<byte>();
-
-            // Temporary buffer to hold the chunk of data read in most recently
-            byte[] rxTemp = new byte[networkRxBufferSize];
-
-            // Keep looping through and reading until we either time out or are instructed to cancel
-            while (((DateTime.Now - lastSocketActivityTime).TotalMilliseconds < TCPResponseTimeoutMS) && 
-                (!cancelToken.IsCancellationRequested))
+            try
             {
-                // The number of bytes most recently read from the network stream
-                int bytesRead = 0;
+                // Mark when the task started
+                DateTime lastSocketActivityTime = DateTime.Now;
 
-                try
+                // Network stream to read/write on
+                NetworkStream stream = tcp.GetStream();
+
+                // Buffer to hold the running incoming data stream
+                List<byte> rxBuffer = new List<byte>();
+
+                // Temporary buffer to hold the chunk of data read in most recently
+                byte[] rxTemp = new byte[networkRxBufferSize];
+
+                // Keep looping through and reading until we either time out or are instructed to cancel
+                while (((DateTime.Now - lastSocketActivityTime).TotalMilliseconds < TCPResponseTimeoutMS) &&
+                    (!cancelToken.IsCancellationRequested))
                 {
-                    // Stream.Read blocks if no data is available (which we don't want) so check for data
-                    // before reading to avoid blocking.
-                    if (stream.DataAvailable)
+                    // The number of bytes most recently read from the network stream
+                    int bytesRead = 0;
+
+                    try
                     {
-                        // Try to read in data from the network stream
-                        bytesRead = stream.Read(rxTemp, 0, networkRxBufferSize);
+                        // Stream.Read blocks if no data is available (which we don't want) so check for data
+                        // before reading to avoid blocking.
+                        if (stream.DataAvailable)
+                        {
+                            // Try to read in data from the network stream
+                            bytesRead = stream.Read(rxTemp, 0, networkRxBufferSize);
+                        }
                     }
-                }
-                catch (IOException)
-                {
-                    // The socket's been forcefully closed on the other end, so we're done here
-                    break;
-                }
-                catch (SocketException)
-                {
-                    // The socket's been forcefully closed on the other end, so we're done here
-                    break;
-                }
-
-                if (bytesRead > 0)
-                {
-                    // Add all the bytes that were read into the temporary buffer into the rxBuffer list 
-                    rxBuffer.AddRange(rxTemp.Where((item, index) => index < bytesRead));
-                }
-                // If we haven't read any data, make sure the socket's still up
-                else if (!IsConnected(tcp))
-                {
-                    break;
-                }
-
-                // If the temp buffer wasn't big enough to hold all the incoming data, we need to read
-                // again without waiting
-                if (bytesRead == networkRxBufferSize)
-                {
-                    continue;
-                }
-
-                // Process new data in the buffer
-                // I didn't do this in the earlier if (bytesRead > 0) so we could give the chance to read more data
-                // if the incoming buffer's full
-                if (bytesRead > 0)
-                {
-                    int rc;
-                    int packetStart;
-                    int packetLength;
-                    byte[] bufferArray = rxBuffer.ToArray();
-
-                    // If there's a new packet in the input buffer...
-                    //if (EncryptedDaedalusPacket.IsValidPacket(bufferArray, out rc, out packetStart, out packetLength))
-                    if (validator(bufferArray, out rc, out packetStart, out packetLength))
+                    catch (IOException)
                     {
-                        addNewRxPacket(TransportType.Tcp, tcp.Client.LocalEndPoint, tcp.Client.RemoteEndPoint,
-                            inPackets, rxPacketWaitRegistry, bufferArray, packetStart, packetLength);
-
-                        // Remove the packet and all preceding bytes from the input buffer
-                        rxBuffer.RemoveRange(0, packetStart + packetLength);
+                        // The socket's been forcefully closed on the other end, so we're done here
+                        break;
+                    }
+                    catch (SocketException)
+                    {
+                        // The socket's been forcefully closed on the other end, so we're done here
+                        break;
                     }
 
-                    // Reset the timeout
-                    lastSocketActivityTime = DateTime.Now;
+                    if (bytesRead > 0)
+                    {
+                        // Add all the bytes that were read into the temporary buffer into the rxBuffer list 
+                        rxBuffer.AddRange(rxTemp.Where((item, index) => index < bytesRead));
+                    }
+                    // If we haven't read any data, make sure the socket's still up
+                    else if (!IsConnected(tcp))
+                    {
+                        break;
+                    }
+
+                    // If the temp buffer wasn't big enough to hold all the incoming data, we need to read
+                    // again without waiting
+                    if (bytesRead == networkRxBufferSize)
+                    {
+                        continue;
+                    }
+
+                    // Process new data in the buffer
+                    // I didn't do this in the earlier if (bytesRead > 0) so we could give the chance to read more data
+                    // if the incoming buffer's full
+                    if (bytesRead > 0)
+                    {
+                        int rc;
+                        int packetStart;
+                        int packetLength;
+                        byte[] bufferArray = rxBuffer.ToArray();
+
+                        // If there's a new packet in the input buffer...
+                        //if (EncryptedDaedalusPacket.IsValidPacket(bufferArray, out rc, out packetStart, out packetLength))
+                        if (validator(bufferArray, out rc, out packetStart, out packetLength))
+                        {
+                            addNewRxPacket(TransportType.Tcp, tcp.Client.LocalEndPoint, tcp.Client.RemoteEndPoint,
+                                inPackets, rxPacketWaitRegistry, bufferArray, packetStart, packetLength);
+
+                            // Remove the packet and all preceding bytes from the input buffer
+                            rxBuffer.RemoveRange(0, packetStart + packetLength);
+                        }
+
+                        // Reset the timeout
+                        lastSocketActivityTime = DateTime.Now;
+                    }
+
+                    // No good way to sleep inside a task... we'll see if this burns too much processor just looping as-is
+                    // or if we need to set up a way to asynchronously wait on incoming data
+                    //Sleep();
                 }
 
-                // No good way to sleep inside a task... we'll see if this burns too much processor just looping as-is
-                // or if we need to set up a way to asynchronously wait on incoming data
-                //Sleep();
+                // If we get here we've either timed out or been ordered to cancel
+                stream.Close();
+                tcp.Close();
             }
-
-            // If we get here we've either timed out or been ordered to cancel
-            stream.Close();
-            tcp.Close();
+            catch (SocketException ex)
+            {
+                exHandler(ex);
+            }
         }
 
         /// <summary>

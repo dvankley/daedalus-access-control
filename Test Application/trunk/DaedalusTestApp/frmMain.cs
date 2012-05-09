@@ -74,7 +74,7 @@ namespace DaedalusTestApp
         /// process waiting for it. This method will begin a new processing sequence.
         /// </summary>
         /// <param name="packet">NetPacket containing the incoming packet to be processed</param>
-        internal void processNewNetPacket(NetPacket packet)
+        private void processNewNetPacket(NetPacket packet)
         {
             //rxTask = Task.Factory.StartNew(x => networkRxTask(clientTokenSource.Token), "networkRxTask", TaskCreationOptions.LongRunning);
             Task.Factory.StartNew(x => packetProcessingSequence(packet), "packetProcessingSequence" + packet.ToString(), packetProcessingTokenSource.Token);
@@ -90,7 +90,7 @@ namespace DaedalusTestApp
         /// <param name="packetLength">Output length of detected packet</param>
         /// <returns>True if a packet was detected, false otherwise. If false, value of output parameters will
         /// be undefined.</returns>
-        internal bool validatePacket(byte[] buffer, out int rc, out int packetStart, out int packetLength)
+        private bool validatePacket(byte[] buffer, out int rc, out int packetStart, out int packetLength)
         {
             DaedalusGlobal.ReturnCodes returnCode;
             int start;
@@ -104,6 +104,12 @@ namespace DaedalusTestApp
             packetLength = length;
             return valid;
         }
+
+        private void exceptionHandler(Exception ex)
+        {
+            Invoke((Action)(() => lstTraffic.Items.Add(ex.ToString())));
+        }
+
         #endregion
 
         #region Helper classes
@@ -144,7 +150,7 @@ namespace DaedalusTestApp
                 selectedNetworkInterface = activeNetworkInterfaces[0];
 
                 // Initialize the comm object with the end point from the selected network interface
-                comm = new TPLTCPQueuedComm(validatePacket, processNewNetPacket,
+                comm = new TPLTCPQueuedComm(validatePacket, processNewNetPacket, exceptionHandler,
                     getDefaultIPv4AddressFromInterface(selectedNetworkInterface), DaedalusGlobal.DaedalusPort);
             }
 
@@ -259,7 +265,6 @@ namespace DaedalusTestApp
         #endregion
 
         #region private methods
-
         /// <summary>
         /// Timer callback to update the status display of the "Toggle Listen" button to indicate 
         /// if the application's socket listener is currently active.
